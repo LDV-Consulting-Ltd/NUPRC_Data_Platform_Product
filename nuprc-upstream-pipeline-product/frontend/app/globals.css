@@ -1,0 +1,31 @@
+/* LDV Design System - plain CSS (no Tailwind build dependency) */
+:root {
+  --ldv-green: #0B6B3A;
+  --ldv-gold: #C9A227;
+  --ldv-blue: #2563EB;
+  --ldv-amber: #F59E0B;
+  --ldv-red: #DC2626;
+}
+
+body {
+  margin: 0;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.chip {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+/* LDV color utilities for use with Tailwind CDN custom config */
+.bg-ldv-green { background-color: var(--ldv-green); }
+.text-ldv-green { color: var(--ldv-green); }
+.border-ldv-green { border-color: var(--ldv-green); }
+.text-ldv-gold { color: var(--ldv-gold); }
+.bg-ldv-gold { background-color: var(--ldv-gold); }
+.ring-ldv-gold { --tw-ring-color: var(--ldv-gold); }
+.text-ldv-blue { color: var(--ldv-blue); }
+.text-ldv-amber { color: var(--ldv-amber); }
+.text-ldv-red { color: var(--ldv-red); }

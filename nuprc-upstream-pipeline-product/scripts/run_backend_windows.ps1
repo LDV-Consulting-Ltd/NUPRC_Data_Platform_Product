@@ -1,4 +1,4 @@
-﻿cd $PSScriptRoot\..
+cd $PSScriptRoot\..
 cd .\backend
 
 if (!(Test-Path .\.venv)) { python -m venv .venv }
@@ -7,4 +7,4 @@ if (!(Test-Path .\.venv)) { python -m venv .venv }
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload

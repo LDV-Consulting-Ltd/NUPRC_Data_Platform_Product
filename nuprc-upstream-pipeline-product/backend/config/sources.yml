@@ -1,0 +1,13 @@
+sources:
+  - name: upstream_crude
+    url: "PASTE_LINK_1"
+    target_table: "bronze.upstream_crude"
+  - name: upstream_condensate
+    url: "PASTE_LINK_2"
+    target_table: "bronze.upstream_condensate"
+  - name: gas_production
+    url: "PASTE_LINK_3"
+    target_table: "bronze.gas_production"
+  - name: exports
+    url: "PASTE_LINK_4"
+    target_table: "bronze.exports"

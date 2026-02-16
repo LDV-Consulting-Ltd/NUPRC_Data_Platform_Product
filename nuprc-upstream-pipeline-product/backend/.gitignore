@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local SQLite files (this app uses PostgreSQL only; ignore any leftover .db)
+*.db
+nuprc.db
+
+# Env
+.env
+.env.local

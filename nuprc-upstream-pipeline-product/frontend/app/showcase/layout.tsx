@@ -1,14 +1,16 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
+  { href: "/", label: "🏠 Home" },
   { href: "/showcase/runs", label: "Number of Runs" },
   { href: "/showcase/quality", label: "Data Quality Metrics" },
   { href: "/showcase/diagrams", label: "Data Model and ETL Diagram" },
   { href: "/showcase/warehouse", label: "Datawarehouse Tables" },
+  { href: "/showcase/catalog", label: "📚 Data Catalog" },
   { href: "/showcase/health", label: "Pipeline Health" },
 ];
 
@@ -19,29 +21,34 @@ export default function ShowcaseLayout({ children }: { children: React.ReactNode
     <div style={{ display: "flex", minHeight: "100vh", background: "#fff" }}>
       {/* Sidebar */}
       <div style={{ width: 300, padding: 24, borderRight: "1px solid #eee" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, overflow: "hidden", border: "1px solid #eee" }}>
-            <Image
-              src="/logo.png"
-              alt="LDV"
-              width={44}
-              height={44}
-              style={{ objectFit: "cover" }}
-              onError={(e) => {
-                // If logo missing, avoid crashing UI
-                (e.currentTarget as any).style.display = "none";
-              }}
-            />
+        <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, cursor: "pointer" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, overflow: "hidden", border: "1px solid #eee", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Image
+                src="/logo.png"
+                alt="LDV Consulting Ltd"
+                width={44}
+                height={44}
+                style={{ objectFit: "contain" }}
+                onError={(e) => {
+                  // If logo missing, show text fallback
+                  const parent = (e.currentTarget as any).parentElement;
+                  if (parent) {
+                    parent.innerHTML = '<div style="color: #f2a36b; fontWeight: 700; fontSize: 18">LDV</div>';
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>Energy Regulator Tenant Data Fabric</div>
+              <div style={{ fontSize: 12, color: "#666" }}>by LDV Consulting Ltd</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 16 }}>NUPRC Upstream Data Platform</div>
-            <div style={{ fontSize: 12, color: "#666" }}>LDV Consulting Ltd — Pipeline Showcase</div>
-          </div>
-        </div>
+        </Link>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {items.map((i) => {
-            const active = pathname === i.href;
+            const active = pathname === i.href || (i.href === "/" && pathname === "/");
             return (
               <Link
                 key={i.href}

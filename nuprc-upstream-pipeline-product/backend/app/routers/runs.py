@@ -1,15 +1,10 @@
-﻿import uuid
+import uuid
 from fastapi import APIRouter, BackgroundTasks
 from sqlalchemy import text
 
 from app.core.db import engine
-from app.models.run_store import init_run_tables, log, set_run
 
 router = APIRouter(prefix="/runs", tags=["runs"])
-
-@router.on_event("startup")
-def _init():
-    init_run_tables()
 
 def _mark_success(run_id: str, rows_loaded: int):
     with engine.begin() as cxn:
