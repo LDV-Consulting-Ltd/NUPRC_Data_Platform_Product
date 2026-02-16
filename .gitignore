@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+env/
+.env
+.vscode/
+.DS_Store
+Thumbs.db
+
+# data files (only keep if you truly never want to push data)
+data/
+*.csv
+*.xlsx
+*.parquet
+*.db
