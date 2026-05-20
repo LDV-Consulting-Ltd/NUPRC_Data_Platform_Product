@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useStartPipelineRun } from "@/hooks/usePipelineRun";
+import { useStartPipelineRun, useStartPgPipelineRun } from "@/hooks/usePipelineRun";
 import { cancelPipelineRun } from "@/lib/api";
 import PipelineLifecycleTracker from "./PipelineLifecycleTracker";
-import type { PipelineMode } from "@/lib/types";
+import type { PipelineMode, PgPipelineMode } from "@/lib/types";
 
 interface PipelineControlPanelProps {
   runId: string | null;
@@ -45,8 +45,10 @@ function stepsFromRunDetail(runDetail: PipelineControlPanelProps["runDetail"]): 
     if (fromApi) {
       if (fromApi.status === "success" || fromApi.status === "done") status = "done";
       else if (fromApi.status === "failed") status = "failed";
-      else status = "running";
-    } else if (runDetail.status === "running" && i === 0) status = "running";
+      else if (fromApi.status === "running") status = "running";
+      else if (fromApi.status === "cancelled") status = "failed";
+      else status = "waiting";
+    }
     return {
       step_key: s.key,
       label: s.label,
@@ -62,12 +64,21 @@ export default function PipelineControlPanel({ runId, onRunIdChange, running, ru
   const [cancelling, setCancelling] = useState(false);
   const queryClient = useQueryClient();
   const startMutation = useStartPipelineRun();
+  const startPgMutation = useStartPgPipelineRun();
 
   const handleOpenModal = (mode: PipelineMode) => setConfirmMode(mode);
   const handleCloseModal = () => setConfirmMode(null);
 
   const runSingle = (mode: PipelineMode) => {
     startMutation.mutate(mode, {
+      onSuccess: (data) => {
+        onRunIdChange(data?.run_id ?? null);
+      },
+    });
+  };
+
+  const runPg = (mode: PgPipelineMode) => {
+    startPgMutation.mutate(mode, {
       onSuccess: (data) => {
         onRunIdChange(data?.run_id ?? null);
       },
@@ -92,12 +103,14 @@ export default function PipelineControlPanel({ runId, onRunIdChange, running, ru
       <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch">
         <button
           type="button"
-          onClick={() => handleOpenModal("full")}
-          disabled={running}
+          onClick={() => runPg("incremental")}
+          disabled={running || startPgMutation.isPending}
           className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold shadow-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
         >
           <span aria-hidden>▶</span> Run Full Pipeline
         </button>
+        <button type="button" onClick={() => runPg("incremental")} disabled={running || startPgMutation.isPending} className="px-4 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm font-semibold hover:bg-emerald-100 disabled:opacity-50">Incremental Run</button>
+        <button type="button" onClick={() => runPg("full_rebuild")} disabled={running || startPgMutation.isPending} className="px-4 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50">Full Rebuild</button>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
           <button
             type="button"

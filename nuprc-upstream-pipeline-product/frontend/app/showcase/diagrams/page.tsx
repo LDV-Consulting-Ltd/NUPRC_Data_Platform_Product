@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { backendGet } from "@/lib/backend";
 
 type DiagramResponse = {
@@ -13,11 +13,54 @@ type DiagramResponse = {
   };
 };
 
+type MermaidAPI = {
+  initialize: (config: Record<string, unknown>) => void;
+  render: (id: string, definition: string) => Promise<{ svg: string }>;
+};
+
+declare global {
+  interface Window {
+    mermaid?: MermaidAPI;
+  }
+}
+
+function loadMermaidScript(): Promise<MermaidAPI> {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Mermaid requires a browser"));
+  }
+  if (window.mermaid) {
+    return Promise.resolve(window.mermaid);
+  }
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-mermaid="true"]');
+    if (existing) {
+      existing.addEventListener("load", () => {
+        if (window.mermaid) resolve(window.mermaid);
+        else reject(new Error("Mermaid failed to load"));
+      });
+      existing.addEventListener("error", () => reject(new Error("Mermaid script error")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
+    script.async = true;
+    script.dataset.mermaid = "true";
+    script.onload = () => {
+      if (window.mermaid) resolve(window.mermaid);
+      else reject(new Error("Mermaid failed to load"));
+    };
+    script.onerror = () => reject(new Error("Failed to load Mermaid library"));
+    document.head.appendChild(script);
+  });
+}
+
 export default function Diagrams() {
   const [data, setData] = useState<DiagramResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const mermaidRef = useRef<HTMLDivElement>(null);
+  const [svgMarkup, setSvgMarkup] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
     backendGet<DiagramResponse>("/diagrams/latest")
@@ -27,69 +70,59 @@ export default function Diagrams() {
   }, []);
 
   useEffect(() => {
-    if (data?.diagram?.diagram_content && mermaidRef.current) {
-      const loadMermaid = async () => {
-        try {
-          // Load Mermaid from CDN if not already loaded
-          if (typeof window !== 'undefined' && !(window as any).mermaid) {
-            await new Promise((resolve, reject) => {
-              const script = document.createElement('script');
-              script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
-              script.onload = resolve;
-              script.onerror = reject;
-              document.head.appendChild(script);
-            });
-          }
-
-          // Initialize Mermaid
-          if ((window as any).mermaid) {
-            (window as any).mermaid.initialize({ 
-              startOnLoad: false,
-              theme: 'default',
-              securityLevel: 'loose'
-            });
-
-            // Clear previous content
-            if (mermaidRef.current) {
-              mermaidRef.current.innerHTML = '';
-              
-              // Create a unique ID for this diagram
-              const diagramId = `mermaid-diagram-${Date.now()}`;
-              mermaidRef.current.id = diagramId;
-              
-              // Render the diagram
-              (window as any).mermaid.render(diagramId, data.diagram.diagram_content)
-                .then((result: { svg: string }) => {
-                  if (mermaidRef.current) {
-                    mermaidRef.current.innerHTML = result.svg;
-                  }
-                })
-                .catch((error: Error) => {
-                  console.error('Mermaid rendering error:', error);
-                  if (mermaidRef.current) {
-                    mermaidRef.current.innerHTML = `<div style="color: red;">Error rendering diagram: ${error.message}</div>`;
-                  }
-                });
-            }
-          }
-        } catch (error) {
-          console.error('Failed to load Mermaid:', error);
-          if (mermaidRef.current) {
-            mermaidRef.current.innerHTML = '<div style="color: red;">Failed to load Mermaid library</div>';
-          }
-        }
-      };
-
-      loadMermaid();
+    const content = data?.diagram?.diagram_content;
+    if (!content) {
+      setSvgMarkup(null);
+      setRenderError(null);
+      return;
     }
-  }, [data]);
+
+    let cancelled = false;
+
+    const renderDiagram = async () => {
+      setRendering(true);
+      setRenderError(null);
+      setSvgMarkup(null);
+
+      try {
+        const mermaid = await loadMermaidScript();
+        if (cancelled) return;
+
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "default",
+          securityLevel: "loose",
+        });
+
+        const renderId = `mermaid-diagram-${Date.now()}`;
+        const { svg } = await mermaid.render(renderId, content);
+        if (!cancelled) {
+          setSvgMarkup(svg);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : String(error);
+          setRenderError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setRendering(false);
+        }
+      }
+    };
+
+    renderDiagram();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.diagram?.diagram_content]);
 
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Data Model and ETL Diagram</h2>
 
       {loading && <div>Loading diagram...</div>}
-      
+
       {err && (
         <div style={{ padding: 12, border: "1px solid #f00", borderRadius: 8, marginBottom: 16 }}>
           Error: {err}
@@ -109,7 +142,6 @@ export default function Diagrams() {
           </div>
 
           <div
-            ref={mermaidRef}
             style={{
               padding: 24,
               border: "1px solid #eee",
@@ -119,10 +151,17 @@ export default function Diagrams() {
               minHeight: 400,
             }}
           >
-            {!mermaidRef.current?.innerHTML && (
-              <div style={{ textAlign: "center", color: "#666", padding: 40 }}>
-                Rendering diagram...
-              </div>
+            {rendering && (
+              <div style={{ textAlign: "center", color: "#666", padding: 40 }}>Rendering diagram...</div>
+            )}
+            {renderError && (
+              <div style={{ color: "red", padding: 16 }}>Error rendering diagram: {renderError}</div>
+            )}
+            {svgMarkup && !rendering && (
+              <div
+                className="mermaid-diagram"
+                dangerouslySetInnerHTML={{ __html: svgMarkup }}
+              />
             )}
           </div>
 

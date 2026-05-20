@@ -1,6 +1,8 @@
 """
-ETL config: DB URLs and paths.
-Supports BRONZE_DB_URL, SILVER_DB_URL, GOLD_DB_URL or single DATABASE_URL with bronze/silver/gold schemas.
+ETL config: DB URLs and paths (PostgreSQL only).
+
+Supports BRONZE_DB_URL, SILVER_DB_URL, GOLD_DB_URL or a single DATABASE_URL
+(Docker Postgres locally; Supabase Postgres in production).
 """
 import os
 from pathlib import Path
@@ -15,8 +17,12 @@ _DEFAULT_URL = os.getenv(
 
 def _get_engine(url, fallback_url: str):
     u = url or fallback_url
-    if u and "postgresql" not in u.split(":")[0].lower():
-        raise ValueError("Only PostgreSQL is supported. Use postgresql+psycopg:// or postgresql:// URL.")
+    scheme = (u or "").split(":", 1)[0].lower()
+    if u and scheme not in ("postgresql", "postgresql+psycopg", "postgresql+psycopg2"):
+        raise ValueError(
+            "Only PostgreSQL is supported. Use postgresql+psycopg:// (Docker or Supabase). "
+            "SQLite is not supported."
+        )
     return create_engine(u, pool_pre_ping=True) if u else None
 
 

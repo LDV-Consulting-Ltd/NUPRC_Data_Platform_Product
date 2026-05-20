@@ -3,13 +3,13 @@
 ## Current Configuration
 
 - **Frontend Port**: 3000 (Next.js default)
-- **Backend Port**: 8001
+- **Backend Port**: 8000
 - **Connection Method**: Next.js rewrites (server-side proxy)
 
 ## How It Works
 
 1. Frontend makes requests to `/api/backend/*`
-2. Next.js rewrites these to `http://127.0.0.1:8001/*`
+2. Next.js rewrites these to `http://127.0.0.1:8000/*`
 3. Backend responds through the proxy
 
 ## Troubleshooting Steps
@@ -17,14 +17,14 @@
 ### Step 1: Verify Backend is Running
 
 Open in browser:
-- `http://localhost:8001/health/summary`
+- `http://localhost:8000/health/summary`
 - Should return: `{"ok": true, "status": "green"}`
 
 If this fails, your backend isn't running. Start it:
 ```powershell
 cd backend
 .venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Step 2: Verify Frontend is Running
@@ -82,11 +82,11 @@ When you click a button, watch the backend terminal:
 
 **Causes:**
 1. Backend not running
-2. Wrong port (frontend looking for 8000, backend on 8001)
+2. Wrong port (frontend looking for 8000, backend on 8000)
 3. CORS issues (should be fixed now)
 
 **Fix:**
-- Verify backend is running on port 8001
+- Verify backend is running on port 8000
 - Restart frontend after config changes
 - Check `next.config.js` has correct port
 
@@ -109,7 +109,7 @@ When you click a button, watch the backend terminal:
 # Terminal 1: Backend
 cd backend
 .venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Terminal 2: Frontend
 cd frontend
@@ -119,8 +119,8 @@ npm run dev
 ### Verify Ports
 
 ```powershell
-# Check what's using port 8001
-netstat -ano | findstr :8001
+# Check what's using port 8000
+netstat -ano | findstr :8000
 
 # Check what's using port 3000
 netstat -ano | findstr :3000
@@ -130,7 +130,7 @@ netstat -ano | findstr :3000
 
 ```powershell
 # Test backend directly
-curl http://localhost:8001/health/summary
+curl http://localhost:8000/health/summary
 
 # Test through Next.js (if frontend is running)
 curl http://localhost:3000/api/backend/health/summary
@@ -142,7 +142,7 @@ You can override the backend URL with an environment variable:
 
 Create `frontend/.env.local`:
 ```
-BACKEND_URL=http://127.0.0.1:8001
+BACKEND_URL=http://127.0.0.1:8000
 ```
 
 Then restart the frontend.

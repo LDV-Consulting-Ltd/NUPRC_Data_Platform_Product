@@ -6,16 +6,29 @@ A full-stack application for the **NUPRC Data Platform** that manages upstream p
 
 ## Quick start
 
+### Database (PostgreSQL)
+
+From `nuprc-upstream-pipeline-product/`:
+
+```bash
+docker compose up -d
+```
+
+Local Postgres: `postgresql+psycopg://postgres:postgres@localhost:5432/nuprc`  
+Production target: **Supabase Postgres** (`DATABASE_URL` from the Supabase dashboard).
+
 ### Backend (API)
 
 ```bash
-cd backend
+cd nuprc-upstream-pipeline-product/backend
 python -m venv .venv
 .venv\Scripts\activate   # Windows
-# source .venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
+set DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/nuprc
 uvicorn app.main:app --reload
 ```
+
+Or use `nuprc-upstream-pipeline-product/scripts/run_backend_windows.ps1` (starts Docker + API).
 
 API runs at **http://localhost:8000**.  
 Docs: **http://localhost:8000/docs**
@@ -68,14 +81,14 @@ nuprc-upstream-pipeline-product/
 
 ## Environment
 
-- **Backend:** Optional `DATABASE_URL`. Defaults to `sqlite:///./nuprc.db` for local development (no Docker required).
-- **Frontend:** Standard Next.js env; point `NEXT_PUBLIC_API_URL` at the backend if needed.
+- **Backend:** `DATABASE_URL` — PostgreSQL only (default: local Docker Postgres). Use your Supabase connection string in production.
+- **Frontend:** `BACKEND_URL` for the API proxy (default `http://127.0.0.1:8000`).
 
 ---
 
 ## Tech stack
 
-- **Backend:** Python 3.x, FastAPI, SQLAlchemy, Pandas, Uvicorn. SQLite (dev) or PostgreSQL (e.g. via `DATABASE_URL`).
+- **Backend:** Python 3.x, FastAPI, SQLAlchemy, Pandas, Uvicorn, **PostgreSQL** (Docker locally, Supabase in production).
 - **Frontend:** Next.js 16, React 19, TypeScript.
 
 For more context and goals, see [ABOUT.md](./ABOUT.md).

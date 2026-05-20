@@ -21,18 +21,18 @@
 
 1. **Backend (FastAPI)**  
    - REST API for runs, quality, warehouse, diagrams, and health.  
-   - Persistence via SQLAlchemy (SQLite by default for dev; PostgreSQL when `DATABASE_URL` is set).  
-   - Tables: `pipeline_run`, `pipeline_log` for run history and logs.
+   - Persistence via SQLAlchemy on **PostgreSQL** (medallion schemas: bronze, silver, gold, admin).  
+   - Tables: `pipeline_run`, `pipeline_log` for run history and logs; ETL observability in `admin.etl_runs`.
 
 2. **Frontend (Next.js)**  
    - Web UI built with Next.js 16 and React 19 (TypeScript).  
-   - Intended to consume the backend API for runs, quality, warehouse, and diagrams.
+   - Consumes the backend API for runs, quality, warehouse, and diagrams.
 
 ## Design choices
 
-- **SQLite by default** — So the backend can run on Windows (and other environments) without Docker.
+- **PostgreSQL only** — Local development uses **Docker Postgres** (`docker compose up -d`). Production target is **Supabase Postgres** via `DATABASE_URL`. SQLite is not supported (JSONB, `TIMESTAMPTZ`, `GENERATED ALWAYS AS IDENTITY`, `CREATE SCHEMA`).
 - **Modular routers** — Separate routers for runs, quality, warehouse, diagrams, and health to keep the API clear and extensible.
-- **Run store** — Centralized run and log storage so other pipeline jobs can register runs and update status (e.g. success/failed, rows loaded).
+- **Run store** — Centralized run and log storage so pipeline jobs can register runs and update status (e.g. success/failed, rows loaded).
 
 ## Relation to the wider platform
 

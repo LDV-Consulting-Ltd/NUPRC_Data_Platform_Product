@@ -15,6 +15,10 @@ const nav = [
     { href: "/lineage-explorer", label: "Lineage Explorer" },
     { href: "/regulatory-views", label: "Regulatory Views" },
   ]},
+  { label: "Developer", links: [
+    { href: "/apis", label: "APIs & Features" },
+    { href: "/showcase", label: "Showcase hub" },
+  ]},
   { label: "Admin (SaaS)", links: [
     { href: "/tenants", label: "Tenants & Orgs" },
     { href: "/pipeline-config", label: "Pipeline Config" },

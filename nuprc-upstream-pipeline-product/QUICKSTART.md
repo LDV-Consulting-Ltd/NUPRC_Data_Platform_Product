@@ -1,6 +1,9 @@
 # Quick start
 
-From this folder (`nuprc-upstream-pipeline-product`), run backend commands from **`backend`**.
+From this folder (`nuprc-upstream-pipeline-product`):
+
+1. Start Postgres: `docker compose up -d`
+2. Run backend commands from **`backend`** (set `DATABASE_URL` if not using the default Docker URL).
 
 ## Run ETL (concession / full / oil / gas / rig)
 

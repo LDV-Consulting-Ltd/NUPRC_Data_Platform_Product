@@ -2,7 +2,10 @@
 from dataclasses import dataclass
 from typing import List
 
-CONCESSION_PDF_URL = "https://www.nuprc.gov.ng/wp-content/uploads/2026/02/NUPRC-Concession-Situation-Final-Merged-@-1st-February-2026-V.1.xlsx.pdf"
+CONCESSION_PDF_URL = (
+    "https://www.nuprc.gov.ng/wp-content/uploads/2026/01/"
+    "NUPRC-Concession-Situation-Final-Merged-%40-1st-January-2026.pdf"
+)
 
 OIL_PAGE = "https://www.nuprc.gov.ng/oil-production-status-report/"
 GAS_PAGE = "https://www.nuprc.gov.ng/gas-production-status-report/"

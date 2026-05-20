@@ -3,26 +3,21 @@ import traceback
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.routers import runs, quality, diagrams, warehouse, health, pipeline, catalog, v1_pipeline
+from app.routers import runs, quality, diagrams, warehouse, health, pipeline, catalog, v1_pipeline, regulatory, governance
 from app.routers import v1_catalog  # alias only: /v1/catalog/* -> same as /catalog/*
-from app.models.run_store import init_run_tables
-from app.models.schemas import init_all_schemas
+from app.models.pg_schemas import init_pg_schemas
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    init_run_tables()
-    init_all_schemas()
+    init_pg_schemas()
     yield
-    # Shutdown (if needed in the future)
 
 
 app = FastAPI(title="NUPRC Upstream Pipeline API", lifespan=lifespan)
 
 
 def _safe_detail(exc: Exception) -> str:
-    """Build error detail string using ASCII replacement to avoid Windows UnicodeEncodeError."""
     try:
         msg = str(exc) if exc is not None else "None"
     except Exception:
@@ -37,7 +32,6 @@ def _safe_detail(exc: Exception) -> str:
 
 @app.exception_handler(Exception)
 def unhandled_exception_handler(request, exc):
-    """Return 500 with error detail so the frontend can show the real cause."""
     if isinstance(exc, HTTPException):
         raise exc
     return JSONResponse(
@@ -46,10 +40,9 @@ def unhandled_exception_handler(request, exc):
     )
 
 
-# Add CORS middleware to allow frontend connections
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Next.js default port
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,8 +55,11 @@ app.include_router(warehouse.router)
 app.include_router(health.router)
 app.include_router(pipeline.router)
 app.include_router(catalog.router)
-app.include_router(v1_catalog.router)  # deprecated alias; use /catalog/*
+app.include_router(v1_catalog.router)
 app.include_router(v1_pipeline.router)
+app.include_router(regulatory.router)
+app.include_router(governance.router)
+
 
 @app.get("/")
 def root():

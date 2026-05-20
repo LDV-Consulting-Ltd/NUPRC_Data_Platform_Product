@@ -1,4 +1,5 @@
 export type PipelineMode = "full" | "oil" | "gas" | "rig" | "concession" | "retry_failed_sources";
+export type PgPipelineMode = "incremental" | "full_rebuild";
 
 export interface PipelineStep {
   step_key: string;
@@ -13,7 +14,7 @@ export interface PipelineStep {
 }
 
 export interface PlatformStatus {
-  system_health: "healthy" | "degraded";
+  system_health: "healthy" | "degraded" | "critical";
   last_run: { at: string; duration_seconds: number; status: "success" | "failed" | "cancelled" } | null;
   records_today: number;
   avg_freshness_minutes: number;
@@ -38,10 +39,11 @@ export interface PipelineRunDetail {
 export type SourceHealthItem = {
   source_key: string;
   label: string;
-  status: "fresh" | "stable" | "degraded" | "down";
+  status: "fresh" | "stable" | "degraded" | "down" | "healthy";
   last_update: string | null;
   expected_interval_minutes: number;
   freshness_score: number;
+  row_count?: number;
   last_error: string | null;
 };
 

@@ -176,6 +176,35 @@ def get_status_alias():
     return get_platform_status()
 
 
+@router.post("/run", response_model=Dict[str, Any])
+def start_pg_pipeline(mode: str = Query("incremental", pattern="^(incremental|full_rebuild)$")):
+    """
+    PostgreSQL-first full pipeline (all four NUPRC sources).
+    mode=incremental skips already-processed files; full_rebuild truncates layers.
+    """
+    import threading
+    from app.services.pg_pipeline.runner import run_pipeline
+
+    run_id = str(uuid.uuid4())
+    from app.models.pg_schemas import init_pg_schemas
+    from app.services.pg_pipeline import meta_log as pg_meta
+
+    try:
+        init_pg_schemas()
+        pg_meta.create_run(run_id, "RUNNING")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"user_message": "Failed to start pipeline.", "technical_details": {"error": str(e)}},
+        )
+
+    def _bg():
+        run_pipeline(mode, run_id=run_id)
+
+    threading.Thread(target=_bg, daemon=False).start()
+    return {"ok": True, "run_id": run_id, "status": "running", "mode": mode}
+
+
 @router.post("/runs", response_model=Dict[str, Any])
 def start_run(body: Optional[StartRunBody] = None):
     """Start an ETL run. Mode: full | oil | gas | rig | concession."""
@@ -186,7 +215,6 @@ def start_run(body: Optional[StartRunBody] = None):
     run_id = str(uuid.uuid4())
     try:
         from etl import observability
-        from etl.run import run_etl
         observability.init_observability_schema()
         observability.create_run(run_id, etl_mode, triggered_by="api")
     except Exception as e:
@@ -212,37 +240,21 @@ def list_runs(
     status: Optional[str] = Query(None),
     mode: Optional[str] = Query(None),
 ):
-    """List pipeline runs (newest first). Query: limit, offset, status, mode."""
+    """List pipeline runs (newest first) from meta + admin.etl_runs."""
+    from app.routers.pg_run_api import list_all_pipeline_runs
     try:
-        from etl.config import get_etl_engine
-    except ImportError:
-        raise HTTPException(status_code=503, detail={"user_message": "ETL not available.", "technical_details": {}})
-    eng = get_etl_engine()
-    where = []
-    params: Dict[str, Any] = {"limit": limit, "offset": offset}
-    if status:
-        where.append("status = :status")
-        params["status"] = status
-    if mode:
-        where.append("mode = :mode")
-        params["mode"] = mode
-    where_sql = " AND ".join(where) if where else "1=1"
-    with eng.connect() as cxn:
-        total = cxn.execute(
-            text(f"SELECT COUNT(*) FROM admin.etl_runs WHERE {where_sql}"),
-            params,
-        ).scalar() or 0
-        rows = cxn.execute(
-            text(f"""
-                SELECT run_id, mode, status, started_at, ended_at, triggered_by, meta_json
-                FROM admin.etl_runs WHERE {where_sql}
-                ORDER BY started_at DESC
-                LIMIT :limit OFFSET :offset
-            """),
-            params,
-        ).mappings().all()
-    runs = [dict(r) for r in rows]
-    return {"ok": True, "runs": runs, "total": total, "limit": limit, "offset": offset}
+        result = list_all_pipeline_runs(limit=limit, offset=offset)
+        if status:
+            filtered = [r for r in result["runs"] if (r.get("status") or "").lower() == status.lower()]
+            result["runs"] = filtered
+            result["total"] = len(filtered)
+        if mode:
+            filtered = [r for r in result["runs"] if (r.get("mode") or "") == mode]
+            result["runs"] = filtered
+            result["total"] = len(filtered)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=503, detail={"user_message": "Could not list runs.", "technical_details": {"error": str(e)}})
 
 
 @router.post("/runs/clear-stuck", response_model=Dict[str, Any])
@@ -310,6 +322,11 @@ def check_blocking_runs():
 @router.get("/runs/{run_id}", response_model=Dict[str, Any])
 def get_run(run_id: str):
     """Get run status and steps (progress). Returns 6 canonical steps for UI lifecycle."""
+    from app.routers.pg_run_api import get_meta_run_response, meta_run_exists
+    if meta_run_exists(run_id):
+        resp = get_meta_run_response(run_id)
+        if resp:
+            return resp
     try:
         from etl.observability import get_run as get_etl_run, get_run_steps
     except ImportError:
@@ -319,7 +336,11 @@ def get_run(run_id: str):
         raise HTTPException(status_code=404, detail={"user_message": "Run not found.", "technical_details": {"run_id": run_id}})
     raw_steps = get_run_steps(run_id)
     steps = _build_canonical_steps(run, raw_steps)
-    status = run.get("status") or "running"
+    status = (run.get("status") or "running").lower()
+    if status in ("success", "succeeded"):
+        status = "success"
+    elif status in ("failed", "failure"):
+        status = "failed"
     meta = _parse_meta(run.get("meta_json"))
     error = meta.get("error") if isinstance(meta, dict) else None
     return {
@@ -364,6 +385,11 @@ def cancel_run(run_id: str):
 @router.get("/runs/{run_id}/diagnostics", response_model=Dict[str, Any])
 def get_run_diagnostics(run_id: str):
     """Get run diagnostics for failure analysis."""
+    from app.routers.pg_run_api import get_meta_diagnostics, meta_run_exists
+    if meta_run_exists(run_id):
+        diag = get_meta_diagnostics(run_id)
+        if diag:
+            return diag
     try:
         from etl.observability import get_run_diagnostics
     except ImportError:
@@ -392,62 +418,87 @@ def get_run_diagnostics(run_id: str):
 
 @router.get("/platform/status", response_model=Dict[str, Any])
 def get_platform_status():
-    """Platform status and latest run summary."""
+    """Platform status from meta.pipeline_run + admin.etl_runs."""
+    from app.routers.pg_run_api import get_platform_status_payload
     try:
-        from etl.observability import get_run
-        from etl.config import get_etl_engine
-    except ImportError:
-        raise HTTPException(status_code=503, detail={"user_message": "ETL not available.", "technical_details": {}})
-    latest_run = None
-    try:
-        eng = get_etl_engine()
-        with eng.connect() as cxn:
-            row = cxn.execute(text("""
-                SELECT run_id, mode, status, started_at, ended_at, meta_json
-                FROM admin.etl_runs ORDER BY started_at DESC LIMIT 1
-            """)).mappings().first()
-            if row:
-                latest_run = dict(row)
+        payload = get_platform_status_payload()
     except Exception as e:
-        pass
+        raise HTTPException(status_code=503, detail={"user_message": "Could not load platform status.", "technical_details": {"error": str(e)}})
     return {
         "ok": True,
-        "latest_run": latest_run,
+        "latest_run": payload.get("latest_run"),
+        "last_successful_run": payload.get("last_successful_run"),
+        "records_today": payload.get("records_today", 0),
+        "system_health": payload.get("system_health", "healthy"),
         "user_message": None,
         "technical_details": {},
     }
 
 
+# Legacy ETL bronze tables (populated by successful runs) + postgres-first fallbacks
+_SOURCE_HEALTH_TABLES: List[tuple] = [
+    ("oil_production_status", "Oil Production Status", ["bronze.etl_oil_production_raw", "bronze.oil_production_status_raw"]),
+    ("gas_production_status", "Gas Production Status", ["bronze.etl_gas_production_raw", "bronze.gas_production_status_raw"]),
+    ("rig_disposition", "Rig Disposition", ["bronze.etl_rig_disposition_raw", "bronze.rig_disposition_raw"]),
+    ("concession_situation", "Concession Situation", ["bronze.etl_concessions_raw", "bronze.concession_situation_raw"]),
+]
+
+
+def _bronze_row_count(cxn, tables: List[str]) -> int:
+    total = 0
+    for table in tables:
+        try:
+            total += int(cxn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0)
+        except Exception:
+            continue
+    return total
+
+
+def _freshness_score_from_bronze_count(count: int) -> int:
+    """Map bronze row volume to a freshness score (not live HTTP reachability)."""
+    if count == 0:
+        return 40
+    if count >= 5000:
+        return 95
+    if count >= 1000:
+        return 88
+    if count >= 100:
+        return 78
+    return min(72, 55 + count // 10)
+
+
+def _status_from_freshness_score(score: int) -> str:
+    if score >= 85:
+        return "fresh"
+    if score >= 70:
+        return "stable"
+    if score >= 50:
+        return "degraded"
+    return "down"
+
+
 @router.get("/sources/health", response_model=Dict[str, Any])
 def get_sources_health():
-    """Source health (bronze row counts as proxy for freshness)."""
+    """Source health from bronze row counts (legacy etl_* tables preferred)."""
     try:
         from etl.config import get_etl_engine
     except ImportError:
         raise HTTPException(status_code=503, detail={"user_message": "ETL not available.", "technical_details": {}})
     eng = get_etl_engine()
     sources = []
-    tables = [
-        ("oil_production_status", "Oil Production", "bronze.etl_oil_production_raw"),
-        ("gas_production_status", "Gas Production", "bronze.etl_gas_production_raw"),
-        ("rig_disposition", "Rig Disposition", "bronze.etl_rig_disposition_raw"),
-        ("concession_situation", "Concession Status", "bronze.etl_concessions_raw"),
-    ]
-    for source_key, label, table in tables:
-        try:
-            with eng.connect() as cxn:
-                count = cxn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0
-        except Exception:
-            count = 0
-        score = min(100, 50 + (count // 100)) if count else 40
-        status = "fresh" if score >= 85 else "stable" if score >= 70 else "degraded" if score >= 50 else "down"
-        sources.append({
-            "source_key": source_key,
-            "label": label,
-            "status": status,
-            "freshness_score": score,
-            "row_count": count,
-        })
+    with eng.connect() as cxn:
+        for source_key, label, tables in _SOURCE_HEALTH_TABLES:
+            count = _bronze_row_count(cxn, tables)
+            score = _freshness_score_from_bronze_count(count)
+            status = _status_from_freshness_score(score)
+            sources.append({
+                "source_key": source_key,
+                "label": label,
+                "status": status,
+                "freshness_score": score,
+                "row_count": count,
+                "bronze_tables_checked": tables,
+            })
     return {
         "ok": True,
         "sources": sources,

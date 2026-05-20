@@ -5,6 +5,7 @@ import { backendGet, backendPost } from "./backend";
 import type {
   PlatformStatus,
   PipelineMode,
+  PgPipelineMode,
   PipelineRunStart,
   PipelineRunDetail,
   SourceHealthItem,
@@ -13,25 +14,44 @@ import type {
 
 /** GET /v1/pipeline/platform/status → PlatformStatus */
 export async function fetchPlatformStatus(): Promise<PlatformStatus> {
-  const data = await backendGet<{ ok: boolean; latest_run?: { run_id: string; status: string; started_at: string; ended_at: string | null; meta_json?: unknown } | null }>("/v1/pipeline/platform/status");
+  const data = await backendGet<{
+    ok: boolean;
+    latest_run?: { run_id: string; status: string; started_at: string; ended_at: string | null; meta_json?: { rows_loaded?: number } } | null;
+    last_successful_run?: { run_id: string; status: string; started_at: string; ended_at?: string | null; rows_loaded?: number } | null;
+    records_today?: number;
+    system_health?: string;
+  }>("/v1/pipeline/platform/status");
+
+  const success = data.last_successful_run;
   const latest = data.latest_run;
+  const source = success ?? (latest?.status === "success" ? latest : null);
+
   let last_run: PlatformStatus["last_run"] = null;
-  if (latest) {
-    const end = latest.ended_at ? new Date(latest.ended_at).getTime() : null;
-    const start = new Date(latest.started_at).getTime();
+  if (source?.started_at) {
+    const end = source.ended_at ? new Date(source.ended_at).getTime() : null;
+    const start = new Date(source.started_at).getTime();
     const dur = end ? Math.round((end - start) / 1000) : 0;
     last_run = {
-      at: latest.started_at,
+      at: source.started_at,
       duration_seconds: dur,
-      status: latest.status === "success" ? "success" : latest.status === "failed" ? "failed" : "cancelled",
+      status: "success",
     };
   }
-  const meta = (latest as { meta_json?: { rows_loaded?: number } })?.meta_json;
-  const rows = typeof meta === "object" && meta && "rows_loaded" in meta ? Number((meta as { rows_loaded?: number }).rows_loaded) : 0;
+
+  const recordsToday =
+    data.records_today ??
+    (success?.rows_loaded != null
+      ? Number(success.rows_loaded)
+      : typeof latest?.meta_json === "object" && latest.meta_json?.rows_loaded != null
+        ? Number(latest.meta_json.rows_loaded)
+        : 0);
+
+  const health = data.system_health ?? (latest?.status === "failed" ? "degraded" : "healthy");
+
   return {
-    system_health: latest?.status === "running" ? "healthy" : latest?.status === "failed" ? "degraded" : "healthy",
+    system_health: health === "degraded" ? "degraded" : health === "healthy" ? "healthy" : "critical",
     last_run,
-    records_today: rows,
+    records_today: recordsToday,
     avg_freshness_minutes: 138,
     sla_compliance: { met: 30, total: 30, label: "Daily SLA: 02:00 delivery" },
   };
@@ -40,6 +60,14 @@ export async function fetchPlatformStatus(): Promise<PlatformStatus> {
 /** POST /v1/pipeline/runs { mode } → { run_id } */
 export async function startPipelineRun(mode: PipelineMode): Promise<PipelineRunStart> {
   const data = await backendPost<{ ok: boolean; run_id: string }>("/v1/pipeline/runs", { mode });
+  return { run_id: data.run_id };
+}
+
+/** POST /v1/pipeline/run?mode=incremental|full_rebuild — Postgres-first full pipeline */
+export async function startPgPipelineRun(mode: PgPipelineMode): Promise<PipelineRunStart> {
+  const data = await backendPost<{ ok: boolean; run_id: string }>(
+    `/v1/pipeline/run?mode=${encodeURIComponent(mode)}`
+  );
   return { run_id: data.run_id };
 }
 
@@ -95,6 +123,7 @@ export async function fetchSourcesHealth(): Promise<SourceHealthItem[]> {
     last_update: null,
     expected_interval_minutes: 120,
     freshness_score: s.freshness_score ?? 50,
+    row_count: s.row_count,
     last_error: null,
   }));
 }
@@ -140,7 +169,17 @@ export async function listPipelineRuns(params?: { limit?: number; offset?: numbe
   if (params?.status) q.set("status", params.status);
   if (params?.mode) q.set("mode", params.mode);
   const data = await backendGet<{ ok: boolean; runs: unknown[]; total: number }>(`/v1/pipeline/runs?${q.toString()}`);
-  return { runs: data.runs as Array<{ run_id: string; mode: string; status: string; started_at: string; ended_at?: string | null }>, total: data.total };
+  return {
+    runs: data.runs as Array<{
+      run_id: string;
+      mode: string;
+      status: string;
+      started_at: string;
+      ended_at?: string | null;
+      rows_loaded?: number;
+    }>,
+    total: data.total,
+  };
 }
 
 /** POST /v1/pipeline/runs/clear-stuck */
@@ -150,7 +189,12 @@ export async function clearStuckRuns(): Promise<{ ok: boolean; cleared: number; 
 
 /** GET /v1/pipeline/runs/blocking */
 export async function checkBlockingRuns(): Promise<{ ok: boolean; blocking_runs: Array<{ run_id: string; mode: string; status: string; started_at: string | null }>; blocking: boolean }> {
-  return backendGet<{ ok: boolean; blocking_runs: unknown[]; blocking: boolean }>("/v1/pipeline/runs/blocking");
+  const data = await backendGet<{ ok: boolean; blocking_runs: unknown[]; blocking: boolean }>("/v1/pipeline/runs/blocking");
+  return {
+    ok: data.ok,
+    blocking: data.blocking,
+    blocking_runs: data.blocking_runs as Array<{ run_id: string; mode: string; status: string; started_at: string | null }>,
+  };
 }
 
 /** GET /v1/pipeline/test */

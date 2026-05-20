@@ -44,17 +44,19 @@ Silver and Gold are mode-aware: only tables for the run mode are populated (e.g.
 
 ## How to run locally
 
-1. **Env vars** (optional; default single DB):
+1. **PostgreSQL** (required): `docker compose up -d` in repo root. SQLite is not supported.
+2. **Env vars** (optional; default single DB):
    - `DATABASE_URL` — single DB for all layers (default: `postgresql+psycopg://postgres:postgres@localhost:5432/nuprc`)
+   - Production: Supabase connection string from the project dashboard
    - Or separate: `BRONZE_DB_URL`, `SILVER_DB_URL`, `GOLD_DB_URL`
 
-2. **Start run**:
+3. **Start run**:
    - API: `POST /v1/pipeline/runs` with body `{"mode": "oil"}` or `{"mode": "full"}`
    - CLI: `python -m etl.cli run --mode oil` (if available)
 
-3. **Poll status**: `GET /v1/pipeline/runs/{run_id}`
+4. **Poll status**: `GET /v1/pipeline/runs/{run_id}`
 
-4. **Cancel**: `POST /v1/pipeline/runs/{run_id}/cancel`
+5. **Cancel**: `POST /v1/pipeline/runs/{run_id}/cancel`
 
 ## Catalog after run
 

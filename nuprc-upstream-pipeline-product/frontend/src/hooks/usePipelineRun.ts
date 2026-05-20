@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchPipelineRun, startPipelineRun, retryPipelineRun } from "@/lib/api";
-import type { PipelineMode } from "@/lib/types";
+import { fetchPipelineRun, startPipelineRun, startPgPipelineRun, retryPipelineRun } from "@/lib/api";
+import type { PipelineMode, PgPipelineMode } from "@/lib/types";
 
 export function usePipelineRun(runId: string | null, options?: { enabled: boolean }) {
   const enabled = options?.enabled ?? !!runId;
@@ -19,6 +19,18 @@ export function useStartPipelineRun() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (mode: PipelineMode) => startPipelineRun(mode),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["platform", "status"] });
+      queryClient.invalidateQueries({ queryKey: ["pipeline", "run", data.run_id] });
+      queryClient.setQueryData(["pipeline", "run", data.run_id], null);
+    },
+  });
+}
+
+export function useStartPgPipelineRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mode: PgPipelineMode) => startPgPipelineRun(mode),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["platform", "status"] });
       queryClient.invalidateQueries({ queryKey: ["pipeline", "run", data.run_id] });

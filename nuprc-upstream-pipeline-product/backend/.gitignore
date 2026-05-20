@@ -7,9 +7,8 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Local SQLite files (this app uses PostgreSQL only; ignore any leftover .db)
+# Legacy local DB artifacts (PostgreSQL only; use Docker or Supabase)
 *.db
-nuprc.db
 
 # Env
 .env
