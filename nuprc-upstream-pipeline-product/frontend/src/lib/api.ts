@@ -87,7 +87,21 @@ export async function retryPipelineRun(_runId?: string): Promise<{ run_id: strin
 
 /** GET /v1/pipeline/sources/health → SourceHealthItem[] (bronze-layer health) */
 export async function fetchSourcesHealth(): Promise<SourceHealthItem[]> {
-  const data = await backendGet<{ ok: boolean; sources: Array<{ source_key: string; label: string; status: string; freshness_score: number; row_count?: number }> }>("/v1/pipeline/sources/health");
+  const data = await backendGet<{
+    ok: boolean;
+    sources: Array<{
+      source_key: string;
+      label: string;
+      status: string;
+      freshness_score: number;
+      row_count?: number;
+      reachability_status?: string;
+      data_presence_status?: string;
+      freshness_status?: string;
+      health_status?: string;
+      explanation?: string;
+    }>;
+  }>("/v1/pipeline/sources/health");
   return (data.sources || []).map((s) => ({
     source_key: s.source_key,
     label: s.label,
@@ -96,6 +110,12 @@ export async function fetchSourcesHealth(): Promise<SourceHealthItem[]> {
     expected_interval_minutes: 120,
     freshness_score: s.freshness_score ?? 50,
     last_error: null,
+    row_count: s.row_count,
+    reachability_status: s.reachability_status as SourceHealthItem["reachability_status"],
+    data_presence_status: s.data_presence_status as SourceHealthItem["data_presence_status"],
+    freshness_status: s.freshness_status,
+    health_status: s.health_status,
+    explanation: s.explanation,
   }));
 }
 

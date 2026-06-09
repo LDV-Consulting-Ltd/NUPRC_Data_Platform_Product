@@ -43,6 +43,12 @@ export type SourceHealthItem = {
   expected_interval_minutes: number;
   freshness_score: number;
   last_error: string | null;
+  row_count?: number;
+  reachability_status?: "reachable" | "unavailable";
+  data_presence_status?: "available" | "missing";
+  freshness_status?: string;
+  health_status?: string;
+  explanation?: string;
 };
 
 export interface RunDiagnostics {

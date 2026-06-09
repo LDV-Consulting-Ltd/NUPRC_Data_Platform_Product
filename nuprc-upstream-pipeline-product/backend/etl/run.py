@@ -191,6 +191,16 @@ def run_etl(
         tables_written = {k: list(v) for k, v in CANONICAL_TABLES.items()}
     except Exception:
         tables_written = {}
+
+    # Optional post-run hook: store pipeline diagrams (failure-tolerant).
+    try:
+        from app.services.v1_diagram_service import store_v1_diagrams_after_run
+        diagram_result = store_v1_diagrams_after_run(run_id)
+        if diagram_result.get("ok"):
+            technical["diagrams_stored"] = diagram_result.get("stored", [])
+    except Exception:
+        pass
+
     observability.end_run(
         run_id,
         status="success",

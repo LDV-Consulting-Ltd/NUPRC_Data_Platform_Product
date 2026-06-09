@@ -4,7 +4,12 @@ This application uses only PostgreSQL. SQLite is not supported (schema uses
 JSONB, TIMESTAMPTZ, GENERATED ALWAYS AS IDENTITY, CREATE SCHEMA).
 """
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

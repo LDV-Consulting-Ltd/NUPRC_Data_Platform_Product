@@ -456,11 +456,24 @@ def get_catalog_summary():
             GROUP BY table_type
         """)).mappings().all()
     
+    file_total = sum(int(f.get("count") or 0) for f in file_stats)
+    table_total = sum(int(t.get("table_count") or 0) for t in table_stats)
+    file_registry_status = {
+        "status": "empty" if file_total == 0 else "available",
+        "reason": (
+            "v1 ETL does not currently populate data_catalog.downloaded_files"
+            if file_total == 0
+            else None
+        ),
+        "tables_catalog_status": "available" if table_total > 0 else "empty",
+    }
+
     return {
         "ok": True,
         "file_statistics": [dict(f) for f in file_stats],
         "source_statistics": [dict(s) for s in source_stats],
-        "table_statistics": [dict(t) for t in table_stats]
+        "table_statistics": [dict(t) for t in table_stats],
+        "file_registry_status": file_registry_status,
     }
 
 

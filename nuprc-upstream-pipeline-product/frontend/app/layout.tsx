@@ -10,16 +10,28 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script src="https://cdn.tailwindcss.com" />
         <script
           dangerouslySetInnerHTML={{
-            __html: "tailwind.config = { theme: { extend: { colors: { 'ldv-green': '#0B6B3A', 'ldv-gold': '#C9A227', 'ldv-blue': '#2563EB', 'ldv-amber': '#F59E0B', 'ldv-red': '#DC2626' } } } } }",
+            __html: `tailwind.config = ${JSON.stringify({
+              theme: {
+                extend: {
+                  colors: {
+                    "ldv-green": "#0B6B3A",
+                    "ldv-gold": "#C9A227",
+                    "ldv-blue": "#2563EB",
+                    "ldv-amber": "#F59E0B",
+                    "ldv-red": "#DC2626",
+                  },
+                },
+              },
+            })};`,
           }}
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <QueryProvider>
           <div className="min-h-screen flex">
             <V2Sidebar />

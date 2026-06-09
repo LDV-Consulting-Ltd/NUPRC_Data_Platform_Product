@@ -1,0 +1,7 @@
+{
+  "extraPaths": [
+    "../../TANNA by LDV/packages",
+    "nuprc-upstream-pipeline-product/backend"
+  ],
+  "pythonVersion": "3.13"
+}

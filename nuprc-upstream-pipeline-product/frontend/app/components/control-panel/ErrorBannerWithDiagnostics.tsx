@@ -8,27 +8,41 @@ interface ErrorBannerWithDiagnosticsProps {
   userMessage?: string;
   onRetry?: () => void;
   show: boolean;
+  variant?: "critical" | "advisory";
+  title?: string;
 }
 
-export default function ErrorBannerWithDiagnostics({ runId, userMessage, onRetry, show }: ErrorBannerWithDiagnosticsProps) {
+export default function ErrorBannerWithDiagnostics({
+  runId,
+  userMessage,
+  onRetry,
+  show,
+  variant = "critical",
+  title,
+}: ErrorBannerWithDiagnosticsProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const { data: diagnostics, isLoading } = useRunDiagnostics(runId, detailsOpen);
 
   if (!show) return null;
 
+  const isAdvisory = variant === "advisory";
+
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <section className={`bg-white rounded-2xl border overflow-hidden ${isAdvisory ? "border-amber-200" : "border-slate-200"}`}>
       <div className="p-4 sm:p-5 border-b border-slate-200 flex items-start justify-between gap-3">
         <div>
           <div className="font-bold flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 rounded-lg bg-red-50 items-center justify-center text-red-600">⚠</span>
-            Source connection issue
+            <span className={`inline-flex h-8 w-8 rounded-lg items-center justify-center ${isAdvisory ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"}`}>⚠</span>
+            {title ?? (isAdvisory ? "Source freshness advisory" : "Source connection issue")}
           </div>
           <div className="text-sm text-slate-600 mt-1">
-            {userMessage ?? "One or more NUPRC sources could not be reached. No data has been lost."}
+            {userMessage ?? (isAdvisory
+              ? "Some sources have lower freshness or row-count scores, but data is available."
+              : "One or more NUPRC sources could not be reached. No data has been lost.")}
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onRetry && !isAdvisory && (
           <button
             type="button"
             onClick={onRetry}
@@ -36,6 +50,7 @@ export default function ErrorBannerWithDiagnostics({ runId, userMessage, onRetry
           >
             Retry
           </button>
+          )}
           <button
             type="button"
             onClick={() => setDetailsOpen((o) => !o)}

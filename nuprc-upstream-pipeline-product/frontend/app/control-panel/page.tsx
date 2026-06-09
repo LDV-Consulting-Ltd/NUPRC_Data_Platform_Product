@@ -18,8 +18,8 @@ export default function ControlPanelPage() {
 
   const running = runDetail?.status === "running";
   const showRunError = runDetail?.status === "failed" || (runDetail?.message && runDetail.status !== "success");
-  const hasSourceIssues = (sourcesHealth ?? []).some((s) => s.status === "down" || s.status === "degraded");
-  const showSourceWarning = hasSourceIssues;
+  const hasSourceDown = (sourcesHealth ?? []).some((s) => s.status === "down");
+  const hasSourceDegraded = (sourcesHealth ?? []).some((s) => s.status === "degraded");
 
   const handleRetrySources = () => {
     retryMutation.mutate(undefined, {
@@ -39,16 +39,26 @@ export default function ControlPanelPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ExecutiveStatusBar />
 
-        {showSourceWarning && (
+        {hasSourceDown && (
           <ErrorBannerWithDiagnostics
             runId={runId}
-            userMessage="One or more NUPRC sources could not be reached. No data has been lost."
+            userMessage="One or more NUPRC sources could not be reached or have no data."
             onRetry={handleRetrySources}
             show={true}
+            variant="critical"
           />
         )}
 
-        {showRunError && !showSourceWarning && (
+        {!hasSourceDown && hasSourceDegraded && (
+          <ErrorBannerWithDiagnostics
+            runId={runId}
+            userMessage="Some sources have lower freshness or row-count scores, but data is available."
+            show={true}
+            variant="advisory"
+          />
+        )}
+
+        {showRunError && !hasSourceDown && !hasSourceDegraded && (
           <ErrorBannerWithDiagnostics
             runId={runId}
             userMessage={runDetail?.message ?? undefined}

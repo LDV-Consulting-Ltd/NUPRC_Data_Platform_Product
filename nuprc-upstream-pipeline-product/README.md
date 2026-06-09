@@ -79,3 +79,39 @@ nuprc-upstream-pipeline-product/
 - **Frontend:** Next.js 16, React 19, TypeScript.
 
 For more context and goals, see [ABOUT.md](./ABOUT.md).
+
+---
+
+## PetroCore Tanna Connector (v0.2.1)
+
+PetroCore exposes a **read-only connector surface** at `/api/v1/tanna/*` from `backend/app/tanna_connector/`. Tanna must consume PetroCore **only** through this API — never direct database access.
+
+v0.2.1 adds contract validation, sync readiness metadata, stable external_ids, and `/api/v1/tanna/status`. See connector README for maturity matrix and sync rules.
+
+### Setup
+
+Copy `backend/.env.example` and set:
+
+```bash
+TANNA_CONNECTOR_TOKEN=your-secret-service-token
+```
+
+All `/api/v1/tanna/*` requests require `Authorization: Bearer <TANNA_CONNECTOR_TOKEN>`.
+
+### Connector endpoints
+
+| Endpoint | Maturity |
+|----------|----------|
+| `GET /api/v1/tanna/manifest` | implemented |
+| `GET /api/v1/tanna/health` | partial |
+| `GET /api/v1/tanna/status` | implemented |
+| `GET /api/v1/tanna/data-products` | implemented |
+| `GET /api/v1/tanna/entities` | partial |
+| `GET /api/v1/tanna/relationships` | partial |
+| `GET /api/v1/tanna/signals` | partial |
+| `GET /api/v1/tanna/patterns` | not_implemented |
+| `GET /api/v1/tanna/illuminations` | partial |
+| `GET /api/v1/tanna/decision-products` | placeholder |
+| `GET /api/v1/tanna/knowledge-assets` | partial |
+
+See [backend/app/tanna_connector/README.md](./backend/app/tanna_connector/README.md) for authentication, operational signal scope, and maturity notes.

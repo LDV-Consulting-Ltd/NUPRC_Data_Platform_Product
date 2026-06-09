@@ -1,17 +1,28 @@
 from contextlib import asynccontextmanager
+import logging
 import traceback
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.routers import runs, quality, diagrams, warehouse, health, pipeline, catalog, v1_pipeline
 from app.routers import v1_catalog  # alias only: /v1/catalog/* -> same as /catalog/*
-from app.models.run_store import init_run_tables
-from app.models.schemas import init_all_schemas
+from app.tanna_connector.router import router as petrocore_tanna_router
+from .models.run_store import init_run_tables
+from .models.schemas import init_all_schemas
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    from app.tanna_connector.security import log_token_configuration_status
+    log_token_configuration_status()
     init_run_tables()
     init_all_schemas()
     yield
@@ -49,7 +60,12 @@ def unhandled_exception_handler(request, exc):
 # Add CORS middleware to allow frontend connections
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Next.js default port
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,6 +80,7 @@ app.include_router(pipeline.router)
 app.include_router(catalog.router)
 app.include_router(v1_catalog.router)  # deprecated alias; use /catalog/*
 app.include_router(v1_pipeline.router)
+app.include_router(petrocore_tanna_router)
 
 @app.get("/")
 def root():

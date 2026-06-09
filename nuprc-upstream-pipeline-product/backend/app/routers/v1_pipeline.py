@@ -307,6 +307,62 @@ def check_blocking_runs():
     }
 
 
+@router.get("/runs/history", response_model=Dict[str, Any])
+def get_runs_history(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """Read-only run history from admin.etl_runs for UI timelines."""
+    try:
+        from etl.config import get_etl_engine
+    except ImportError:
+        raise HTTPException(status_code=503, detail={"user_message": "ETL not available.", "technical_details": {}})
+    eng = get_etl_engine()
+    with eng.connect() as cxn:
+        total = cxn.execute(text("SELECT COUNT(*) FROM admin.etl_runs")).scalar() or 0
+        rows = cxn.execute(
+            text("""
+                SELECT run_id, mode, status, started_at, ended_at, triggered_by, meta_json
+                FROM admin.etl_runs
+                ORDER BY started_at DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            {"limit": limit, "offset": offset},
+        ).mappings().all()
+    history = []
+    for row in rows:
+        item = dict(row)
+        meta = _parse_meta(item.get("meta_json"))
+        started = item.get("started_at")
+        ended = item.get("ended_at")
+        duration_seconds = None
+        if started and ended:
+            try:
+                duration_seconds = int((ended - started).total_seconds())
+            except Exception:
+                duration_seconds = None
+        history.append({
+            "run_id": item.get("run_id"),
+            "status": item.get("status"),
+            "mode": item.get("mode"),
+            "triggered_by": item.get("triggered_by"),
+            "started_at": str(started) if started else None,
+            "ended_at": str(ended) if ended else None,
+            "duration_seconds": duration_seconds,
+            "rows_bronze": meta.get("rows_loaded") if isinstance(meta, dict) else None,
+            "error_summary": meta.get("error") if isinstance(meta, dict) else None,
+            "created_at": str(started) if started else None,
+        })
+    return {
+        "ok": True,
+        "source": "admin.etl_runs",
+        "total": int(total),
+        "runs": history,
+        "user_message": None,
+        "technical_details": {},
+    }
+
+
 @router.get("/runs/{run_id}", response_model=Dict[str, Any])
 def get_run(run_id: str):
     """Get run status and steps (progress). Returns 6 canonical steps for UI lifecycle."""
@@ -418,6 +474,58 @@ def get_platform_status():
     }
 
 
+def _build_source_health_entry(
+    source_key: str,
+    label: str,
+    table: str,
+    count: int,
+    query_error: Optional[str] = None,
+) -> dict:
+    """Bronze row-count heuristic with clearer status dimensions for the UI."""
+    score = min(100, 50 + (count // 100)) if count else 40
+    legacy_status = (
+        "fresh" if score >= 85 else "stable" if score >= 70 else "degraded" if score >= 50 else "down"
+    )
+    if query_error:
+        reachability_status = "unavailable"
+        data_presence_status = "missing"
+        freshness_status = "unknown"
+        health_status = "down"
+        explanation = f"Could not query {table}: {query_error}"
+    elif count > 0:
+        reachability_status = "reachable"
+        data_presence_status = "available"
+        freshness_status = legacy_status if legacy_status in ("fresh", "stable") else "stale"
+        health_status = legacy_status if legacy_status != "down" else "degraded"
+        if legacy_status == "degraded":
+            explanation = (
+                f"{label} has {count:,} bronze rows but a lower freshness score ({score}) "
+                "based on row-count heuristics. Data is present."
+            )
+        else:
+            explanation = f"{label} has {count:,} bronze rows with freshness score {score}."
+    else:
+        reachability_status = "reachable"
+        data_presence_status = "missing"
+        freshness_status = "missing"
+        health_status = "down"
+        explanation = f"No rows found in {table}."
+
+    return {
+        "source_key": source_key,
+        "label": label,
+        "status": legacy_status,
+        "freshness_score": score,
+        "score": score,
+        "row_count": count,
+        "reachability_status": reachability_status,
+        "data_presence_status": data_presence_status,
+        "freshness_status": freshness_status,
+        "health_status": health_status,
+        "explanation": explanation,
+    }
+
+
 @router.get("/sources/health", response_model=Dict[str, Any])
 def get_sources_health():
     """Source health (bronze row counts as proxy for freshness)."""
@@ -434,20 +542,14 @@ def get_sources_health():
         ("concession_situation", "Concession Status", "bronze.etl_concessions_raw"),
     ]
     for source_key, label, table in tables:
+        query_error = None
         try:
             with eng.connect() as cxn:
-                count = cxn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0
-        except Exception:
+                count = int(cxn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0)
+        except Exception as exc:
             count = 0
-        score = min(100, 50 + (count // 100)) if count else 40
-        status = "fresh" if score >= 85 else "stable" if score >= 70 else "degraded" if score >= 50 else "down"
-        sources.append({
-            "source_key": source_key,
-            "label": label,
-            "status": status,
-            "freshness_score": score,
-            "row_count": count,
-        })
+            query_error = str(exc)
+        sources.append(_build_source_health_entry(source_key, label, table, count, query_error))
     return {
         "ok": True,
         "sources": sources,

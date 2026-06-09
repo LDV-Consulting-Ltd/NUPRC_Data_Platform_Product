@@ -1,0 +1,7 @@
+{
+  "extraPaths": [
+    "../../../TANNA by LDV/packages",
+    "backend"
+  ],
+  "pythonVersion": "3.13"
+}

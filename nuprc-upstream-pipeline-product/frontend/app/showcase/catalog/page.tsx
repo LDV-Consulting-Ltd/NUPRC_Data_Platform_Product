@@ -72,6 +72,11 @@ type TableDetails = {
 
 type CatalogSummary = {
   ok: boolean;
+  file_registry_status?: {
+    status: string;
+    reason?: string | null;
+    tables_catalog_status?: string;
+  };
   file_statistics: Array<{
     download_status: string;
     count: number;
@@ -315,7 +320,47 @@ export default function CatalogPage() {
             </select>
           </div>
 
-          {files && (
+          {files && files.total === 0 && (
+            <div
+              style={{
+                padding: 20,
+                border: "1px solid #eee",
+                borderRadius: 12,
+                backgroundColor: "#f9f9f9",
+                fontSize: 14,
+                color: "#444",
+                lineHeight: 1.6,
+              }}
+            >
+              <p style={{ margin: "0 0 12px 0" }}>
+                No downloaded file registry entries are available for the v1 ETL path yet. The pipeline
+                currently updates physical medallion tables and{" "}
+                <code>data_catalog.available_tables</code>, but does not register individual downloaded
+                files.
+              </p>
+              <p style={{ margin: 0 }}>
+                Use the{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("tables")}
+                  style={{
+                    color: "#0a0",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    font: "inherit",
+                  }}
+                >
+                  Tables tab
+                </button>{" "}
+                for live medallion table metadata and row counts.
+              </p>
+            </div>
+          )}
+
+          {files && files.total > 0 && (
             <div>
               <div style={{ marginBottom: 16, fontSize: 14, color: "#666" }}>
                 Showing {files.files.length} of {files.total} files
