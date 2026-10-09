@@ -149,8 +149,22 @@ export async function clearStuckRuns(): Promise<{ ok: boolean; cleared: number; 
 }
 
 /** GET /v1/pipeline/runs/blocking */
-export async function checkBlockingRuns(): Promise<{ ok: boolean; blocking_runs: Array<{ run_id: string; mode: string; status: string; started_at: string | null }>; blocking: boolean }> {
-  return backendGet<{ ok: boolean; blocking_runs: unknown[]; blocking: boolean }>("/v1/pipeline/runs/blocking");
+interface BlockingRunsResponse {
+  ok: boolean;
+  blocking_runs: Array<{
+    run_id: string;
+    mode: string;
+    status: string;
+    started_at: string | null;
+  }>;
+  blocking: boolean;
+}
+
+/** GET /v1/pipeline/runs/blocking */
+export async function checkBlockingRuns(): Promise<BlockingRunsResponse> {
+  return backendGet<BlockingRunsResponse>(
+    "/v1/pipeline/runs/blocking"
+  );
 }
 
 /** GET /v1/pipeline/test */
