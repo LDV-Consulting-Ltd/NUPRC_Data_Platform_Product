@@ -26,7 +26,6 @@ function statusBadge(status: SourceHealthItem["status"]) {
 function statusLabel(status: SourceHealthItem["status"]) {
   switch (status) {
     case "fresh":
-    case "healthy":
       return "Fresh";
     case "degraded":
       return "Degraded";
