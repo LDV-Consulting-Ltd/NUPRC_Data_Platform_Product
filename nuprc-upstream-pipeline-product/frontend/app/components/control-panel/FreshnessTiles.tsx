@@ -13,7 +13,6 @@ const sourceIcons: Record<string, string> = {
 function statusBadge(status: SourceHealthItem["status"]) {
   switch (status) {
     case "fresh":
-    case "healthy":
       return "bg-emerald-50 text-emerald-700";
     case "degraded":
       return "bg-amber-50 text-amber-700";
