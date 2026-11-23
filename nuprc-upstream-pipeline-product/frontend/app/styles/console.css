@@ -103,6 +103,10 @@
 .ldv-console select,
 .ldv-console textarea {
   font: inherit;
+}
+.ldv-console input,
+.ldv-console select,
+.ldv-console textarea {
   color: inherit;
 }
 
