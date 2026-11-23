@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 import traceback
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,11 @@ async def lifespan(app: FastAPI):
     # Shutdown (if needed in the future)
 
 
-app = FastAPI(title="NUPRC Upstream Pipeline API", lifespan=lifespan)
+app = FastAPI(
+    title="NUPRC Upstream Pipeline API",
+    lifespan=lifespan,
+    root_path="/backend" if os.environ.get("VERCEL") == "1" else "",
+)
 
 
 def _safe_detail(exc: Exception) -> str:

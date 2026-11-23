@@ -16,11 +16,11 @@ export default function TestConnection() {
     const tests: Record<string, TestResult> = {};
 
     try {
-      const response = await fetch("http://127.0.0.1:8001/health/summary");
+      const response = await fetch("/api/backend/health/summary");
       const data = await response.json();
-      tests.directBackend = { success: true, data };
+      tests.publicPath = { success: response.ok, data };
     } catch (error) {
-      tests.directBackend = { success: false, error: error instanceof Error ? error.message : "Request failed" };
+      tests.publicPath = { success: false, error: error instanceof Error ? error.message : "Request failed" };
     }
 
     try {
@@ -73,7 +73,7 @@ export default function TestConnection() {
           </section>
         ))}
       <StateBlock tone="partial" title="Where this page looks">
-        Direct health check uses http://127.0.0.1:8001. The application proxy uses /api/backend.
+        The console calls /api/backend on this site, and that route forwards to the backend service. The same API is also public at /backend, with the prefix removed before FastAPI sees the path.
       </StateBlock>
     </>
   );
