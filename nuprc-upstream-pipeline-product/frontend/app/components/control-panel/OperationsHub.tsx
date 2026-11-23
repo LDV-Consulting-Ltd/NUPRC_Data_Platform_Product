@@ -1,44 +1,70 @@
 "use client";
 
 import Link from "next/link";
+import { NUPRC_REPORTS } from "@/lib/public-sources";
 
-const links = [
-  { section: "Analytics", items: [{ href: "/run-history", label: "Run History" }, { href: "/data-quality", label: "Data Quality Dashboard" }] },
-  { section: "Architecture", items: [{ href: "/lineage-explorer", label: "Data Model Explorer" }, { href: "/warehouse-tables", label: "Warehouse Tables" }] },
-  { section: "Governance", items: [{ href: "/catalog", label: "Data Catalog" }, { href: "/lineage-explorer", label: "Lineage Explorer" }, { href: "/regulatory-views", label: "Regulatory Views" }] },
-  { section: "Platform Health", items: [{ href: "/run-history", label: "Pipeline Health" }, { href: "/source-health", label: "Source Availability" }, { href: "/source-health", label: "Error Trends" }] },
+const links: { section: string; items: { href: string; label: string; external?: boolean }[] }[] = [
+  {
+    section: "Upstream Intelligence",
+    items: [
+      { href: "/regulatory", label: "Production, rigs, and concessions" },
+      { href: "/data-quality", label: "Data quality" },
+    ],
+  },
+  {
+    section: "Source evidence",
+    items: [
+      { href: "/source-health", label: "Source reports" },
+      { href: NUPRC_REPORTS, label: "NUPRC reports", external: true },
+    ],
+  },
+  {
+    section: "Governance",
+    items: [
+      { href: "/catalog", label: "Published datasets" },
+      { href: "/warehouse-tables", label: "Warehouse" },
+      { href: "/lineage", label: "Lineage" },
+    ],
+  },
+  {
+    section: "Operations",
+    items: [
+      { href: "/run-history", label: "Ingestion runs" },
+      { href: "/sla", label: "SLA & compliance" },
+    ],
+  },
 ];
 
 export default function OperationsHub() {
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm text-slate-500">Operations Hub</div>
-          <div className="text-xl font-bold">Monitoring, Governance & Architecture</div>
-        </div>
-        <Link href="/run-history" className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm font-semibold">
-          Open All
+    <section className="pc-card">
+      <div className="pc-card-h">
+        <h2>Operations hub</h2>
+        <Link className="pc-btn" href="/run-history">
+          Ingestion runs
         </Link>
       </div>
-
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {links.map((group) => (
-          <div key={group.section} className="rounded-2xl border border-slate-200 p-4">
-            <div className="font-bold">{group.section}</div>
-            <div className="mt-3 space-y-2">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href + item.label}
-                  href={item.href}
-                  className="block px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-sm"
-                >
-                  {item.label}
-                </Link>
-              ))}
+      <div className="pc-card-b">
+        <div className="pc-flow">
+          {links.map((group) => (
+            <div key={group.section} className="pc-step">
+              <div className="pc-step-k">{group.section}</div>
+              <div className="pc-actions" style={{ marginTop: 8, flexDirection: "column", alignItems: "flex-start" }}>
+                {group.items.map((item) =>
+                  item.external ? (
+                    <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer">
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link key={item.href} href={item.href}>
+                      {item.label}
+                    </Link>
+                  )
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );

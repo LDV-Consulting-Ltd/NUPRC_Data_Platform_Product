@@ -1,12 +1,9 @@
-"use client";
+import { redirectPreserving } from "../lib/preserve-redirect";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function DataCatalogRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/catalog");
-  }, [router]);
-  return null;
+export default async function DataCatalogRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirectPreserving("/catalog", await searchParams);
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/", label: "🏠 Home" },
+  { href: "/showcase", label: "Showcase home" },
   { href: "/showcase/runs", label: "Number of Runs" },
   { href: "/showcase/quality", label: "Data Quality Metrics" },
   { href: "/showcase/diagrams", label: "Data Model and ETL Diagram" },
@@ -21,7 +21,7 @@ export default function ShowcaseLayout({ children }: { children: React.ReactNode
     <div style={{ display: "flex", minHeight: "100vh", background: "#fff" }}>
       {/* Sidebar */}
       <div style={{ width: 300, padding: 24, borderRight: "1px solid #eee" }}>
-        <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link href="/showcase" style={{ textDecoration: "none", color: "inherit" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, cursor: "pointer" }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, overflow: "hidden", border: "1px solid #eee", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Image

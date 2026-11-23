@@ -1,67 +1,36 @@
-import V2Header from "../components/V2Header";
+"use client";
+
+import { GapNote, MetricTile, PageHeader, SortTable, StateBlock } from "../components/console/ui";
+
+const rows = [
+  { run: "RUN-2026-02-07-2114", cost: "—", dataset: "Full pipeline" },
+  { run: "RUN-2026-02-07-0200", cost: "—", dataset: "Full pipeline" },
+];
 
 export default function CostPage() {
-  const rows = [
-    { run: "RUN-2026-02-07-2114", cost: "—", dataset: "Full pipeline" },
-    { run: "RUN-2026-02-07-0200", cost: "—", dataset: "Full pipeline" },
-  ];
-
   return (
     <>
-      <V2Header
-        title="Cost & Usage"
-        subtitle="FinOps dashboard: cost per run, cost per dataset, forecast"
+      <PageHeader title="Cost & Usage" description="FinOps placeholders. No billing feed is connected, so costs stay blank." />
+      <GapNote>Run identifiers below are the notes previously shown on this screen. They are not a live billing extract.</GapNote>
+      <section className="pc-metrics">
+        <MetricTile label="Cost this month" value="—" detail="No billing unit is configured" />
+        <MetricTile label="Cost per run" value="—" detail="Average not supplied" />
+        <MetricTile label="Cost per dataset" value="—" detail="Not supplied" />
+        <MetricTile label="Forecast, next 30 days" value="—" detail="Not supplied" />
+      </section>
+      <SortTable
+        rows={rows}
+        caption="Cost notes"
+        rowKey={(row) => row.run}
+        columns={[
+          { id: "run", header: "Run", cell: (row) => row.run },
+          { id: "cost", header: "Cost", cell: (row) => row.cost },
+          { id: "dataset", header: "Dataset / scope", cell: (row) => row.dataset },
+        ]}
       />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Summary cards */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="text-xs text-slate-500">Cost this month</div>
-            <div className="text-xl font-bold mt-1">—</div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="text-xs text-slate-500">Cost per run (avg)</div>
-            <div className="text-xl font-bold mt-1">—</div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="text-xs text-slate-500">Cost per dataset</div>
-            <div className="text-xl font-bold mt-1">—</div>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="text-xs text-slate-500">Forecast (next 30d)</div>
-            <div className="text-xl font-bold mt-1">—</div>
-          </div>
-        </section>
-
-        {/* Cost per run table */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-slate-200 font-bold">Cost per run</div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="text-left p-4 font-semibold">Run</th>
-                  <th className="text-left p-4 font-semibold">Cost</th>
-                  <th className="text-left p-4 font-semibold">Dataset / scope</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.run} className="border-b border-slate-100">
-                    <td className="p-4 font-mono text-xs">{r.run}</td>
-                    <td className="p-4">{r.cost}</td>
-                    <td className="p-4">{r.dataset}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <div className="text-sm text-slate-500">
-          FinOps metrics (cost per run, per dataset, forecast) can be wired to your billing backend (V2).
-        </div>
-      </div>
+      <StateBlock tone="awaiting" title="Billing is not connected">
+        Cost per run, cost per dataset, and the forecast can be wired when a billing API exists. This screen does not invent amounts.
+      </StateBlock>
     </>
   );
 }

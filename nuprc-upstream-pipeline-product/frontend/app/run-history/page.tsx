@@ -1,103 +1,166 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import V2Header from "../components/V2Header";
+import { useRouter, useSearchParams } from "next/navigation";
+import { listPipelineRuns } from "@/lib/api";
+import { errorMessage, permissionDenied } from "@/lib/page-error";
+import {
+  CountLabel,
+  GapNote,
+  LoadingRows,
+  PageHeader,
+  PermissionState,
+  SortTable,
+  StateBlock,
+  StatusPill,
+  toneForStatus,
+} from "../components/console/ui";
+
+type RunRow = {
+  run_id: string;
+  mode: string;
+  status: string;
+  started_at: string;
+  ended_at?: string | null;
+};
 
 export default function RunHistoryPage() {
-  const runs = [
-    { id: "RUN-2026-02-07-2114", trigger: "Scheduled", duration: "14m 22s", cost: "—", volume: "1.24M", result: "Success", sla: "Met" },
-    { id: "RUN-2026-02-07-0200", trigger: "Scheduled", duration: "18m 05s", cost: "—", volume: "1.41M", result: "Success", sla: "Met" },
-    { id: "RUN-2026-02-06-2112", trigger: "Manual", duration: "12m 44s", cost: "—", volume: "1.18M", result: "Success", sla: "—" },
-    { id: "RUN-2026-02-06-0200", trigger: "Scheduled", duration: "—", cost: "—", volume: "—", result: "Failed", sla: "Breach" },
-  ];
+  const params = useSearchParams();
+  const router = useRouter();
+  const status = params.get("status") ?? "";
+  const [result, setResult] = useState<{ status: string; rows: RunRow[]; total: number; error: unknown } | null>(null);
+  const [selected, setSelected] = useState<string | null>(params.get("run_id"));
+
+  useEffect(() => {
+    let cancelled = false;
+    listPipelineRuns({ limit: 50, status: status || undefined })
+      .then((res) => {
+        if (!cancelled) setResult({ status, rows: res.runs, total: res.total, error: null });
+      })
+      .catch((err) => {
+        if (!cancelled) setResult({ status, rows: [], total: 0, error: err });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  const loading = result?.status !== status;
+  const rows = result?.status === status ? result.rows : [];
+  const total = result?.status === status ? result.total : 0;
+  const error = result?.status === status ? result.error : null;
+
+  const setStatus = (next: string) => {
+    const query = new URLSearchParams(params.toString());
+    if (next) query.set("status", next);
+    else query.delete("status");
+    const qs = query.toString();
+    router.replace(qs ? `/run-history?${qs}` : "/run-history");
+  };
+
+  const current = rows.find((row) => row.run_id === selected) ?? null;
 
   return (
     <>
-      <V2Header
-        title="Run History"
-        subtitle="Timeline and table of pipeline runs with trigger, duration, cost, volume, result, and SLA impact"
+      <PageHeader
+        title="Ingestion Runs"
+        description="Pipeline attempts returned by the operations API. This list is the attempt history. It is not the published warehouse snapshot."
+        actions={
+          <label>
+            Status
+            <select className="pc-field" value={status} onChange={(event) => setStatus(event.target.value)}>
+              <option value="">All</option>
+              <option value="running">Running</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+        }
       />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Timeline + Table hybrid */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-slate-200">
-            <div className="text-sm text-slate-500">Run Timeline (last 7 days)</div>
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
-              {["07 Feb 02:00", "07 Feb 21:14", "06 Feb 02:00", "06 Feb 21:12", "05 Feb 02:00"].map((label, i) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={`shrink-0 px-4 py-2 rounded-xl text-sm font-semibold ${
-                    i === 1 ? "bg-ldv-green text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-                >
-                  {label}
+      {loading && <LoadingRows />}
+      {!loading && error != null &&
+        (permissionDenied(error) ? (
+          <PermissionState />
+        ) : (
+          <StateBlock tone="error" title="Ingestion runs could not be loaded">
+            {errorMessage(error)}
+          </StateBlock>
+        ))}
+      {!loading && error == null && (
+        <div className="pc-work">
+          <div className="pc-work-main">
+            <CountLabel shown={rows.length} total={total} />
+            <SortTable
+              rows={rows}
+              caption="Pipeline runs"
+              rowKey={(row) => row.run_id}
+              selectedKey={current?.run_id}
+              onRow={(row) => setSelected(row.run_id)}
+              empty={<StateBlock tone="empty" title="No ingestion runs match this filter" />}
+              columns={[
+                { id: "id", header: "Run", sticky: true, sortValue: (row) => row.run_id, cell: (row) => row.run_id },
+                { id: "mode", header: "Mode", sortValue: (row) => row.mode, cell: (row) => row.mode },
+                {
+                  id: "status",
+                  header: "Result",
+                  sortValue: (row) => row.status,
+                  cell: (row) => <StatusPill tone={toneForStatus(row.status)}>{row.status}</StatusPill>,
+                },
+                {
+                  id: "started",
+                  header: "Started",
+                  sortValue: (row) => row.started_at,
+                  cell: (row) => new Date(row.started_at).toLocaleString("en-GB"),
+                },
+                {
+                  id: "ended",
+                  header: "Ended",
+                  sortValue: (row) => row.ended_at ?? null,
+                  cell: (row) => (row.ended_at ? new Date(row.ended_at).toLocaleString("en-GB") : "—"),
+                },
+              ]}
+            />
+            <GapNote>Cost, data volume, and SLA impact are not on this runs payload, so they are omitted rather than filled in.</GapNote>
+          </div>
+          {current && (
+            <aside className="pc-detail" aria-label="Run detail">
+              <div className="pc-detail-bar">
+                <h2>Attempt</h2>
+                <button type="button" className="pc-btn" onClick={() => setSelected(null)}>
+                  Close
                 </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="text-left p-4 font-semibold">Run ID</th>
-                  <th className="text-left p-4 font-semibold">Trigger Source</th>
-                  <th className="text-left p-4 font-semibold">Duration</th>
-                  <th className="text-left p-4 font-semibold">Cost</th>
-                  <th className="text-left p-4 font-semibold">Data Volume</th>
-                  <th className="text-left p-4 font-semibold">Result</th>
-                  <th className="text-left p-4 font-semibold">SLA Impact</th>
-                  <th className="text-left p-4 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map((run) => (
-                  <tr key={run.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="p-4 font-mono text-xs">{run.id}</td>
-                    <td className="p-4">{run.trigger}</td>
-                    <td className="p-4">{run.duration}</td>
-                    <td className="p-4">{run.cost}</td>
-                    <td className="p-4">{run.volume}</td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          run.result === "Success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
-                        }`}
-                      >
-                        {run.result}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          run.sla === "Met" ? "bg-emerald-50 text-emerald-700" : run.sla === "Breach" ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {run.sla}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <Link
-                        href={`/showcase/runs?run_id=${run.id}`}
-                        className="text-ldv-blue font-semibold hover:underline"
-                      >
-                        View
-                      </Link>
-                      <span className="mx-2 text-slate-300">|</span>
-                      <button type="button" className="text-ldv-blue font-semibold hover:underline">
-                        Re-run from step
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <p className="text-xs text-slate-500">
-          Run Replay: Select a run and choose a step to re-execute from (V2 feature).
-        </p>
-      </div>
+              </div>
+              <dl className="pc-detail-list">
+                <div>
+                  <dt>Run</dt>
+                  <dd>{current.run_id}</dd>
+                </div>
+                <div>
+                  <dt>Mode</dt>
+                  <dd>{current.mode}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{current.status}</dd>
+                </div>
+                <div>
+                  <dt>Started</dt>
+                  <dd>{new Date(current.started_at).toLocaleString("en-GB")}</dd>
+                </div>
+                <div>
+                  <dt>Ended</dt>
+                  <dd>{current.ended_at ? new Date(current.ended_at).toLocaleString("en-GB") : "Still open or not supplied"}</dd>
+                </div>
+              </dl>
+              <p className="pc-detail-note">
+                Re-running is done from the <Link href="/control-panel">Control Panel</Link>. This page does not start a pipeline.
+              </p>
+            </aside>
+          )}
+        </div>
+      )}
     </>
   );
 }

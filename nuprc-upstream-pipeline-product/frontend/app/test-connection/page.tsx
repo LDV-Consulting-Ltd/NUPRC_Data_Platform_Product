@@ -1,49 +1,44 @@
 "use client";
 
 import { useState } from "react";
-import { backendGet, backendPost } from "@/lib/backend";
+import { backendGet } from "@/lib/backend";
+import { PageHeader, StateBlock, StatusPill } from "../components/console/ui";
+
+type TestResult = { success: boolean; data?: unknown; error?: string };
 
 export default function TestConnection() {
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<Record<string, TestResult> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const testConnection = async () => {
     setLoading(true);
     setResults(null);
+    const tests: Record<string, TestResult> = {};
 
-    const tests: any = {};
-
-    // Test 1: Direct backend health check
     try {
       const response = await fetch("http://127.0.0.1:8001/health/summary");
       const data = await response.json();
       tests.directBackend = { success: true, data };
-    } catch (e: any) {
-      tests.directBackend = { success: false, error: e.message };
+    } catch (error) {
+      tests.directBackend = { success: false, error: error instanceof Error ? error.message : "Request failed" };
     }
 
-    // Test 2: Through Next.js rewrite
     try {
-      const data = await backendGet("/health/summary");
-      tests.rewritePath = { success: true, data };
-    } catch (e: any) {
-      tests.rewritePath = { success: false, error: e.message };
+      tests.rewritePath = { success: true, data: await backendGet("/health/summary") };
+    } catch (error) {
+      tests.rewritePath = { success: false, error: error instanceof Error ? error.message : "Request failed" };
     }
 
-    // Test 3: Pipeline test endpoint (v1)
     try {
-      const data = await backendGet("/v1/pipeline/test");
-      tests.pipelineTest = { success: true, data };
-    } catch (e: any) {
-      tests.pipelineTest = { success: false, error: e.message };
+      tests.pipelineTest = { success: true, data: await backendGet("/v1/pipeline/test") };
+    } catch (error) {
+      tests.pipelineTest = { success: false, error: error instanceof Error ? error.message : "Request failed" };
     }
 
-    // Test 4: Pipeline status (v1)
     try {
-      const data = await backendGet("/v1/pipeline/status");
-      tests.pipelineStatus = { success: true, data };
-    } catch (e: any) {
-      tests.pipelineStatus = { success: false, error: e.message };
+      tests.pipelineStatus = { success: true, data: await backendGet("/v1/pipeline/status") };
+    } catch (error) {
+      tests.pipelineStatus = { success: false, error: error instanceof Error ? error.message : "Request failed" };
     }
 
     setResults(tests);
@@ -51,58 +46,35 @@ export default function TestConnection() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
-      <h1>Backend Connection Test</h1>
-      <button
-        onClick={testConnection}
-        disabled={loading}
-        style={{
-          padding: "12px 24px",
-          fontSize: 16,
-          backgroundColor: "#0070f3",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          cursor: loading ? "not-allowed" : "pointer",
-          marginBottom: 24,
-        }}
-      >
-        {loading ? "Testing..." : "Test Connection"}
-      </button>
-
-      {results && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {Object.entries(results).map(([key, value]: [string, any]) => (
-            <div
-              key={key}
-              style={{
-                padding: 16,
-                border: `2px solid ${value.success ? "#00ff00" : "#ff0000"}`,
-                borderRadius: 8,
-                backgroundColor: value.success ? "#f0fff0" : "#fff0f0",
-              }}
-            >
-              <h3>{key}</h3>
-              {value.success ? (
-                <pre style={{ overflow: "auto", fontSize: 12 }}>
-                  {JSON.stringify(value.data, null, 2)}
-                </pre>
-              ) : (
-                <div style={{ color: "red" }}>Error: {value.error}</div>
-              )}
-            </div>
-          ))}
-        </div>
+    <>
+      <PageHeader
+        title="Connection test"
+        description="Checks the local API proxy. This page does not start a pipeline run. It is not part of the production navigation."
+        actions={
+          <button type="button" className="pc-btn pc-btn-primary" onClick={testConnection} disabled={loading}>
+            {loading ? "Testing…" : "Test connection"}
+          </button>
+        }
+      />
+      {loading && (
+        <StateBlock tone="loading" title="Checking the API">
+          Health and pipeline test endpoints are being read. No ingestion run is started.
+        </StateBlock>
       )}
-
-      <div style={{ marginTop: 24, padding: 16, backgroundColor: "#f5f5f5", borderRadius: 8 }}>
-        <h3>Configuration Info:</h3>
-        <ul>
-          <li>Backend URL (from config): http://127.0.0.1:8001</li>
-          <li>Frontend rewrite path: /api/backend/* → http://127.0.0.1:8001/*</li>
-          <li>Current page URL: {typeof window !== "undefined" ? window.location.href : "N/A"}</li>
-        </ul>
-      </div>
-    </div>
+      {results &&
+        Object.entries(results).map(([key, value]) => (
+          <section key={key} className={value.success ? "pc-state pc-state-awaiting" : "pc-state pc-state-error"}>
+            <h2>
+              {key} <StatusPill tone={value.success ? "ok" : "danger"}>{value.success ? "Reached" : "Failed"}</StatusPill>
+            </h2>
+            <div className="pc-state-body">
+              {value.success ? <pre>{JSON.stringify(value.data, null, 2)}</pre> : <p>{value.error}</p>}
+            </div>
+          </section>
+        ))}
+      <StateBlock tone="partial" title="Where this page looks">
+        Direct health check uses http://127.0.0.1:8001. The application proxy uses /api/backend.
+      </StateBlock>
+    </>
   );
 }

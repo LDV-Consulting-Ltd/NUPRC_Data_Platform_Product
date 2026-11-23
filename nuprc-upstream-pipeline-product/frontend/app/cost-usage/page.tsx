@@ -1,12 +1,9 @@
-"use client";
+import { redirectPreserving } from "../lib/preserve-redirect";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function CostUsageRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/cost");
-  }, [router]);
-  return null;
+export default async function CostUsageRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirectPreserving("/cost", await searchParams);
 }

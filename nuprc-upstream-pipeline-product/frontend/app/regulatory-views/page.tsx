@@ -1,12 +1,9 @@
-"use client";
+import { redirectPreserving } from "../lib/preserve-redirect";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function RegulatoryViewsRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/regulatory");
-  }, [router]);
-  return null;
+export default async function RegulatoryViewsRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirectPreserving("/regulatory", await searchParams);
 }

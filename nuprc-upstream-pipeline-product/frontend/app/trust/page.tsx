@@ -1,79 +1,46 @@
-import V2Header from "../components/V2Header";
+"use client";
+
+import { GapNote, PageHeader, SortTable, StatusPill } from "../components/console/ui";
+
+const heatmap = [
+  { dataset: "bronze.oil_production_status_raw", commodity: "Oil", score: 92, trend: "up" },
+  { dataset: "bronze.gas_production_status_raw", commodity: "Gas", score: 72, trend: "down" },
+  { dataset: "silver.oil_production", commodity: "Oil", score: 95, trend: "up" },
+  { dataset: "warehouse.fact_oil_production", commodity: "Oil", score: 98, trend: "stable" },
+];
 
 export default function TrustPage() {
-  const heatmap = [
-    { dataset: "bronze.oil_production_status_raw", score: 92, trend: "up" },
-    { dataset: "bronze.gas_production_status_raw", score: 72, trend: "down" },
-    { dataset: "silver.oil_production", score: 95, trend: "up" },
-    { dataset: "warehouse.fact_oil_production", score: 98, trend: "stable" },
-  ];
-
   return (
     <>
-      <V2Header
+      <PageHeader
         title="Trust Scoring"
-        subtitle="Platform-wide data trust heatmap"
+        description="Illustrated trust scores by dataset. Oil and gas tables are listed separately."
       />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <section className="bg-white rounded-2xl border border-slate-200 p-5">
-          <div className="text-sm text-slate-500">Platform-wide</div>
-          <div className="text-xl font-bold mt-1">Trust heatmap</div>
-          <div className="mt-4 rounded-xl overflow-hidden border border-slate-200">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left p-4 font-semibold">Dataset</th>
-                  <th className="text-left p-4 font-semibold">Trust score</th>
-                  <th className="text-left p-4 font-semibold">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {heatmap.map((row) => (
-                  <tr
-                    key={row.dataset}
-                    className="border-b border-slate-100"
-                    style={{
-                      backgroundColor:
-                        row.score >= 85
-                          ? "rgba(16, 185, 129, 0.08)"
-                          : row.score >= 70
-                            ? "rgba(245, 158, 11, 0.08)"
-                            : "rgba(220, 38, 38, 0.06)",
-                    }}
-                  >
-                    <td className="p-4 font-mono text-xs">{row.dataset}</td>
-                    <td className="p-4">
-                      <span
-                        className={`font-bold ${
-                          row.score >= 85 ? "text-emerald-700" : row.score >= 70 ? "text-amber-700" : "text-red-700"
-                        }`}
-                      >
-                        {row.score}
-                      </span>
-                      <span className="text-slate-500"> / 100</span>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-slate-600 capitalize">{row.trend}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <div className="flex gap-4 text-sm">
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-emerald-200" /> High (85+)
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-amber-200" /> Medium (70–84)
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-red-200" /> Low (&lt;70)
-          </span>
-        </div>
+      <GapNote>Scores are workspace illustrations on a 0–100 scale. They are not a published NUPRC quality result, and no page or table reference is attached.</GapNote>
+      <div className="pc-legend">
+        <span><i className="pc-swatch" style={{ background: "#146c43" }} /> High, 85 and above</span>
+        <span><i className="pc-swatch" style={{ background: "#c4a35a" }} /> Medium, 70–84</span>
+        <span><i className="pc-swatch" style={{ background: "#8f2d2d" }} /> Low, under 70</span>
       </div>
+      <SortTable
+        rows={heatmap}
+        caption="Trust illustrations"
+        rowKey={(row) => row.dataset}
+        columns={[
+          { id: "dataset", header: "Dataset", sticky: true, sortValue: (row) => row.dataset, cell: (row) => row.dataset },
+          { id: "commodity", header: "Commodity", sortValue: (row) => row.commodity, cell: (row) => row.commodity },
+          {
+            id: "score",
+            header: "Trust score",
+            align: "right",
+            sortValue: (row) => row.score,
+            cell: (row) => (
+              <StatusPill tone={row.score >= 85 ? "ok" : row.score >= 70 ? "warn" : "danger"}>{row.score}/100</StatusPill>
+            ),
+          },
+          { id: "trend", header: "Trend", sortValue: (row) => row.trend, cell: (row) => row.trend },
+        ]}
+      />
     </>
   );
 }

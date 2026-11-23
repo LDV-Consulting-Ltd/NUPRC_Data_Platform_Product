@@ -1,12 +1,9 @@
-"use client";
+import { redirectPreserving } from "../lib/preserve-redirect";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function LineageExplorerRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/lineage");
-  }, [router]);
-  return null;
+export default async function LineageExplorerRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirectPreserving("/lineage", await searchParams);
 }
