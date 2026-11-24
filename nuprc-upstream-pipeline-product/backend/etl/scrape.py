@@ -102,6 +102,8 @@ def excel_links_for_slug(slug: str) -> tuple:
     links = []
     seen = set()
     for doc in docs:
+        if not isinstance(doc, dict):
+            continue
         raw = str(doc.get("excelUrl") or "").strip()
         if not raw:
             continue
@@ -123,6 +125,8 @@ def latest_pdf_for_slug(slug: str) -> tuple:
     if err:
         return ("", err)
     for doc in docs:
+        if not isinstance(doc, dict):
+            continue
         raw = str(doc.get("pdfUrl") or "").strip()
         if raw:
             return (_absolute_upload(raw), None)
