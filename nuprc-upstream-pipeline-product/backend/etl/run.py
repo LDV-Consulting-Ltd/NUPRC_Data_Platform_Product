@@ -9,11 +9,10 @@ from typing import List, Optional, Tuple
 
 from etl import observability
 from etl.acquire import download_file, download_concession_pdf
-from etl.scrape import get_excel_links_for_source
+from etl.scrape import current_concession_pdf, get_excel_links_for_source
 from etl.bronze import load_excel_to_bronze, load_concession_to_bronze
 from etl.silver import transform_to_silver
 from etl.gold import transform_to_gold
-from etl.sources import CONCESSION_PDF_URL
 
 
 def _run_acquisition(
@@ -28,11 +27,16 @@ def _run_acquisition(
     for mode in modes:
         if mode == "concession":
             observability.start_step(run_id, "acquire_concession")
-            path, sha, err = download_concession_pdf(CONCESSION_PDF_URL, "concession")
+            pdf_url, pdf_err = current_concession_pdf()
+            if pdf_err or not pdf_url:
+                message = pdf_err or "No concession PDF is published"
+                observability.end_step(run_id, "acquire_concession", status="failed", error={"message": message})
+                return results, f"Concession download failed: {message}"
+            path, sha, err = download_concession_pdf(pdf_url, "concession")
             if err:
                 observability.end_step(run_id, "acquire_concession", status="failed", error={"message": err})
                 return results, f"Concession download failed: {err}"
-            results.append((path, "concession", CONCESSION_PDF_URL))
+            results.append((path, "concession", pdf_url))
             observability.end_step(run_id, "acquire_concession", status="success", metrics={"files": 1, "sha256": sha})
             continue
         if mode not in ("oil", "gas", "rig"):

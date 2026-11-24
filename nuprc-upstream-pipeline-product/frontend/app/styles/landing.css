@@ -1,6 +1,4 @@
-/* Public landing. Structure follows the NMDPRA marketing page (dark canvas, sticky header, amber entry).
-   The deployed NMDPRA URL returned 410, so exact logo crop, footer, and typeface were not verified against that deployment.
-   Local NMDPRA source has no footer component; the footer below uses the same header palette. */
+/* Public landing for the LDV Data Console. Dark canvas, sticky header, and amber entry. */
 
 .ldv-landing {
   --ldv-bg: #070d18;

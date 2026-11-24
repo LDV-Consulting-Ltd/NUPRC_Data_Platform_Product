@@ -2,6 +2,7 @@
 Scrape oil/gas/rig pages and return Excel links ONLY (.xlsx, .xls). No PDFs.
 Uses retries with backoff for reliability (fix "Failed to fetch").
 """
+import json
 import random
 import time
 from typing import List, Dict, Any
@@ -11,6 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from etl.config import CONNECT_TIMEOUT, READ_TIMEOUT, USER_AGENT
+from etl.sources import ACREAGE_SLUG, FILE_BASE, GAS_SLUG, OIL_SLUG, RIG_SLUG, report_api
 
 MAX_FETCH_RETRIES = 3
 BACKOFF_BASE = 1.0
@@ -22,12 +24,8 @@ def _backoff(attempt: int) -> float:
     jitter = delay * 0.2 * (2 * random.random() - 1)
     return max(0.1, delay + jitter)
 
-# Page URLs (same as prompt)
-OIL_PAGE = "https://www.nuprc.gov.ng/oil-production-status-report/"
-GAS_PAGE = "https://www.nuprc.gov.ng/gas-production-status-report/"
-RIG_PAGE = "https://www.nuprc.gov.ng/rig-disposition-report/"
-
 EXCEL_EXT = (".xlsx", ".xls")
+_SLUGS = {"oil": OIL_SLUG, "gas": GAS_SLUG, "rig": RIG_SLUG}
 
 
 def _extract_excel_links(html: str, base_url: str) -> List[Dict[str, str]]:
@@ -73,36 +71,87 @@ def fetch_page(url: str) -> tuple:
     return ("", last_error or "unknown error")
 
 
-def get_excel_links_oil() -> tuple:
-    """Returns (list of link dicts, error_message)."""
-    html, err = fetch_page(OIL_PAGE)
+def _absolute_upload(path: str) -> str:
+    cleaned = path.strip()
+    if cleaned.startswith("http://") or cleaned.startswith("https://"):
+        return cleaned
+    return FILE_BASE + cleaned.lstrip("/")
+
+
+def _documents(slug: str) -> tuple:
+    """Returns (documents, error). Documents are ordered as published."""
+    body, err = fetch_page(report_api(slug))
     if err:
         return ([], err)
-    return (_extract_excel_links(html, OIL_PAGE), None)
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        return ([], f"Report catalog was not JSON: {exc}")
+    data = payload.get("data") if isinstance(payload, dict) else None
+    docs = data.get("documents") if isinstance(data, dict) else None
+    if not isinstance(docs, list):
+        return ([], "Report catalog did not include documents")
+    docs.sort(key=lambda doc: doc.get("order") if isinstance(doc, dict) and isinstance(doc.get("order"), int) else 0)
+    return (docs, None)
+
+
+def excel_links_for_slug(slug: str) -> tuple:
+    docs, err = _documents(slug)
+    if err:
+        return ([], err)
+    links = []
+    seen = set()
+    for doc in docs:
+        raw = str(doc.get("excelUrl") or "").strip()
+        if not raw:
+            continue
+        full = _absolute_upload(raw)
+        if not urlparse(full).path.lower().endswith(EXCEL_EXT) or full in seen:
+            continue
+        seen.add(full)
+        links.append({
+            "url": full,
+            "filename": (urlparse(full).path or "/").split("/")[-1] or "file.xlsx",
+            "file_type": "excel",
+        })
+    return (links, None)
+
+
+def latest_pdf_for_slug(slug: str) -> tuple:
+    """Returns (url, error) for the first published PDF on a report page."""
+    docs, err = _documents(slug)
+    if err:
+        return ("", err)
+    for doc in docs:
+        raw = str(doc.get("pdfUrl") or "").strip()
+        if raw:
+            return (_absolute_upload(raw), None)
+    return ("", "No PDF is published for this report")
+
+
+def get_excel_links_oil() -> tuple:
+    """Returns (list of link dicts, error_message)."""
+    return excel_links_for_slug(OIL_SLUG)
 
 
 def get_excel_links_gas() -> tuple:
     """Returns (list of link dicts, error_message)."""
-    html, err = fetch_page(GAS_PAGE)
-    if err:
-        return ([], err)
-    return (_extract_excel_links(html, GAS_PAGE), None)
+    return excel_links_for_slug(GAS_SLUG)
 
 
 def get_excel_links_rig() -> tuple:
     """Returns (list of link dicts, error_message)."""
-    html, err = fetch_page(RIG_PAGE)
-    if err:
-        return ([], err)
-    return (_extract_excel_links(html, RIG_PAGE), None)
+    return excel_links_for_slug(RIG_SLUG)
 
 
 def get_excel_links_for_source(source: str) -> tuple:
     """source in ('oil','gas','rig'). Returns (links, error)."""
-    if source == "oil":
-        return get_excel_links_oil()
-    if source == "gas":
-        return get_excel_links_gas()
-    if source == "rig":
-        return get_excel_links_rig()
-    return ([], f"unknown source: {source}")
+    slug = _SLUGS.get(source)
+    if not slug:
+        return ([], f"unknown source: {source}")
+    return excel_links_for_slug(slug)
+
+
+def current_concession_pdf() -> tuple:
+    """Live acreage/concession PDF from the reports catalog. Returns (url, error)."""
+    return latest_pdf_for_slug(ACREAGE_SLUG)

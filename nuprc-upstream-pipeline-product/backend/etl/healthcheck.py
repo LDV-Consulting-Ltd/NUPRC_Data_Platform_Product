@@ -5,7 +5,8 @@ from typing import List, Tuple
 
 import httpx
 
-from etl.sources import OIL_PAGE, GAS_PAGE, RIG_PAGE, CONCESSION_PDF_URL
+from etl.scrape import current_concession_pdf
+from etl.sources import OIL_PAGE, GAS_PAGE, RIG_PAGE
 from etl.config import USER_AGENT, CONNECT_TIMEOUT, READ_TIMEOUT
 
 
@@ -66,7 +67,10 @@ def healthcheck() -> Tuple[bool, List[str]]:
 
     # Concession PDF (HEAD to avoid full download; some hosts require GET)
     try:
-        r = httpx.head(CONCESSION_PDF_URL, headers={"User-Agent": USER_AGENT}, timeout=timeout, follow_redirects=True)
+        pdf_url, pdf_err = current_concession_pdf()
+        if pdf_err or not pdf_url:
+            raise RuntimeError(pdf_err or "No concession PDF is published")
+        r = httpx.head(pdf_url, headers={"User-Agent": USER_AGENT}, timeout=timeout, follow_redirects=True)
         if r.status_code == 200:
             messages.append("Concession PDF: OK")
         else:
